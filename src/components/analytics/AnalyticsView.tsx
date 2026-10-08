@@ -1,16 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { useJournal } from '../../contexts/JournalContext';
-import { Trade } from '../../types';
 import {
   TrendingUp,
-  Percent,
-  Layers,
-  Award,
   ChevronLeft,
   ChevronRight,
   Calendar,
   BarChart2,
-  DollarSign,
   Activity,
 } from 'lucide-react';
 
@@ -40,7 +35,6 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onSelectJournalDay
   const equityCurveData = useMemo(() => {
     if (trades.length === 0) return [];
 
-    // Sort chronologically ascending
     const sortedTrades = [...trades].sort(
       (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     );
@@ -98,7 +92,6 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onSelectJournalDay
     const year = currentMonthDate.getFullYear();
     const month = currentMonthDate.getMonth();
 
-    // Map day 'YYYY-MM-DD' to aggregated trade info
     const dayTradeMap: Record<string, { pnl: number; count: number; completed: boolean }> = {};
 
     trades.forEach((trade) => {
@@ -120,9 +113,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onSelectJournalDay
       }
     });
 
-    // Days in current month
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    // Day of week of 1st day (0 = Sun, 1 = Mon...)
     const firstDayIndex = (new Date(year, month, 1).getDay() + 6) % 7; // Monday = 0
 
     const days = [];
@@ -165,7 +156,6 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onSelectJournalDay
     let min = Math.min(0, ...equities);
     let max = Math.max(0, ...equities);
 
-    // Give buffer
     const range = max - min || 100;
     min -= range * 0.1;
     max += range * 0.1;
@@ -196,10 +186,10 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onSelectJournalDay
     <div className="space-y-6">
       {/* Top Section Header */}
       <div>
-        <h2 className="text-xl font-bold text-white tracking-tight">
+        <h2 className="text-xl font-bold text-zinc-900 dark:text-white tracking-tight">
           Performance Analytics & Heatmap
         </h2>
-        <p className="text-xs text-slate-400 mt-1">
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
           Precision execution metrics calculated live from your Supabase trade database
         </p>
       </div>
@@ -207,66 +197,66 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onSelectJournalDay
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
         {/* Net P&L */}
-        <div className="bg-[#111A2E] border border-[#1E2B45] rounded-xl p-4 shadow-sm relative overflow-hidden">
-          <span className="text-[11px] font-mono uppercase text-slate-400 block mb-1">
+        <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-sm transition-colors">
+          <span className="text-[11px] font-mono uppercase text-zinc-500 dark:text-zinc-400 block mb-1">
             Total Realized P&L
           </span>
           <div
             className={`text-2xl font-bold font-mono tabular-nums ${
               analyticsStats.totalPnl > 0
-                ? 'text-[#00C896]'
+                ? 'text-emerald-600 dark:text-emerald-400'
                 : analyticsStats.totalPnl < 0
-                ? 'text-[#FF4D5E]'
-                : 'text-white'
+                ? 'text-red-600 dark:text-red-400'
+                : 'text-zinc-900 dark:text-white'
             }`}
           >
             {analyticsStats.totalPnl > 0 ? '+' : ''}${analyticsStats.totalPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
-          <div className="text-[11px] text-slate-400 mt-1 font-mono">
+          <div className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 font-mono">
             {trades.length} recorded trades
           </div>
         </div>
 
         {/* Win Rate */}
-        <div className="bg-[#111A2E] border border-[#1E2B45] rounded-xl p-4 shadow-sm">
-          <span className="text-[11px] font-mono uppercase text-slate-400 block mb-1">
+        <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-sm transition-colors">
+          <span className="text-[11px] font-mono uppercase text-zinc-500 dark:text-zinc-400 block mb-1">
             Execution Win Rate
           </span>
-          <div className="text-2xl font-bold font-mono text-[#2F80FF] tabular-nums">
+          <div className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400 tabular-nums">
             {analyticsStats.winRate.toFixed(1)}%
           </div>
-          <div className="flex items-center gap-2 mt-1.5 text-[11px] font-mono text-slate-400">
-            <span className="text-[#00C896]">{analyticsStats.winningTrades}W</span>
+          <div className="flex items-center gap-2 mt-1.5 text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
+            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{analyticsStats.winningTrades}W</span>
             <span>·</span>
-            <span className="text-[#FF4D5E]">{analyticsStats.losingTrades}L</span>
+            <span className="text-red-600 dark:text-red-400 font-semibold">{analyticsStats.losingTrades}L</span>
             <span>·</span>
-            <span className="text-[#F59E0B]">{analyticsStats.breakevenTrades}BE</span>
+            <span className="text-amber-500">{analyticsStats.breakevenTrades}BE</span>
           </div>
         </div>
 
         {/* Profit Factor */}
-        <div className="bg-[#111A2E] border border-[#1E2B45] rounded-xl p-4 shadow-sm">
-          <span className="text-[11px] font-mono uppercase text-slate-400 block mb-1">
+        <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-sm transition-colors">
+          <span className="text-[11px] font-mono uppercase text-zinc-500 dark:text-zinc-400 block mb-1">
             Profit Factor
           </span>
-          <div className="text-2xl font-bold font-mono text-white tabular-nums">
+          <div className="text-2xl font-bold font-mono text-zinc-900 dark:text-white tabular-nums">
             {analyticsStats.profitFactor.toFixed(2)}
           </div>
-          <div className="text-[11px] text-slate-400 mt-1 font-mono flex items-center justify-between">
+          <div className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 font-mono flex items-center justify-between">
             <span>Avg Win: ${analyticsStats.avgWin.toFixed(0)}</span>
             <span>Avg Loss: ${analyticsStats.avgLoss.toFixed(0)}</span>
           </div>
         </div>
 
         {/* Best Instrument */}
-        <div className="bg-[#111A2E] border border-[#1E2B45] rounded-xl p-4 shadow-sm">
-          <span className="text-[11px] font-mono uppercase text-slate-400 block mb-1">
+        <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-sm transition-colors">
+          <span className="text-[11px] font-mono uppercase text-zinc-500 dark:text-zinc-400 block mb-1">
             Top Yield Instrument
           </span>
-          <div className="text-2xl font-bold font-mono text-white tracking-tight">
+          <div className="text-2xl font-bold font-mono text-zinc-900 dark:text-white tracking-tight">
             {analyticsStats.bestInstrument ? analyticsStats.bestInstrument.symbol : '—'}
           </div>
-          <div className="text-[11px] text-[#00C896] mt-1 font-mono font-semibold">
+          <div className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-mono font-semibold">
             {analyticsStats.bestInstrument
               ? `+$${analyticsStats.bestInstrument.pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
               : 'No closed trades yet'}
@@ -275,23 +265,23 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onSelectJournalDay
       </div>
 
       {/* Equity Curve Chart */}
-      <div className="bg-[#111A2E] border border-[#1E2B45] rounded-xl p-5 shadow-lg">
+      <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm transition-colors">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono flex items-center gap-2">
-              <Activity className="w-4 h-4 text-[#2F80FF]" />
+            <h3 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider font-mono flex items-center gap-2">
+              <Activity className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               <span>Cumulative Equity Curve ($)</span>
             </h3>
-            <p className="text-xs text-slate-400">Account trajectory across all closed executions</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">Account trajectory across all closed executions</p>
           </div>
-          <div className="text-xs font-mono text-slate-300">
-            Net: <span className={analyticsStats.totalPnl >= 0 ? 'text-[#00C896] font-bold' : 'text-[#FF4D5E] font-bold'}>${analyticsStats.totalPnl.toFixed(2)}</span>
+          <div className="text-xs font-mono text-zinc-700 dark:text-zinc-300">
+            Net: <span className={analyticsStats.totalPnl >= 0 ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-red-600 dark:text-red-400 font-bold'}>${analyticsStats.totalPnl.toFixed(2)}</span>
           </div>
         </div>
 
         {trades.length === 0 ? (
-          <div className="h-48 flex flex-col items-center justify-center border border-dashed border-[#1E2B45] rounded-lg text-slate-500 text-xs">
-            <TrendingUp className="w-8 h-8 mb-2 opacity-40 text-[#2F80FF]" />
+          <div className="h-48 flex flex-col items-center justify-center border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-400 text-xs">
+            <TrendingUp className="w-8 h-8 mb-2 opacity-40 text-emerald-500" />
             <span>No trades yet. Log your first trade to plot your equity curve.</span>
           </div>
         ) : (
@@ -301,9 +291,9 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onSelectJournalDay
               className="w-full h-56 sm:h-64 select-none"
             >
               <defs>
-                <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#2F80FF" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="#2F80FF" stopOpacity="0.0" />
+                <linearGradient id="emeraldEquityGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#10B981" stopOpacity="0.28" />
+                  <stop offset="100%" stopColor="#10B981" stopOpacity="0.0" />
                 </linearGradient>
               </defs>
 
@@ -313,14 +303,16 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onSelectJournalDay
                 y1={zeroY}
                 x2={chartWidth - padding.right}
                 y2={zeroY}
-                stroke="#1E2B45"
+                stroke="currentColor"
+                className="text-zinc-200 dark:text-zinc-800"
                 strokeWidth="1.5"
                 strokeDasharray="4 4"
               />
               <text
                 x={padding.left - 8}
                 y={zeroY + 3}
-                fill="#64748B"
+                fill="currentColor"
+                className="text-zinc-400 dark:text-zinc-500"
                 fontSize="9"
                 fontFamily="JetBrains Mono"
                 textAnchor="end"
@@ -332,7 +324,8 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onSelectJournalDay
               <text
                 x={padding.left - 8}
                 y={padding.top + 5}
-                fill="#64748B"
+                fill="currentColor"
+                className="text-zinc-400 dark:text-zinc-500"
                 fontSize="9"
                 fontFamily="JetBrains Mono"
                 textAnchor="end"
@@ -344,7 +337,8 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onSelectJournalDay
               <text
                 x={padding.left - 8}
                 y={chartHeight - padding.bottom + 10}
-                fill="#64748B"
+                fill="currentColor"
+                className="text-zinc-400 dark:text-zinc-500"
                 fontSize="9"
                 fontFamily="JetBrains Mono"
                 textAnchor="end"
@@ -356,7 +350,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onSelectJournalDay
               {areaString && (
                 <polygon
                   points={areaString}
-                  fill="url(#equityGradient)"
+                  fill="url(#emeraldEquityGradient)"
                 />
               )}
 
@@ -364,7 +358,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onSelectJournalDay
               {pointsString && (
                 <polyline
                   fill="none"
-                  stroke="#2F80FF"
+                  stroke="#10B981"
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -385,10 +379,10 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onSelectJournalDay
                     cx={cx}
                     cy={cy}
                     r={hoveredPoint?.equity === d.equity ? 5 : 3}
-                    fill={d.tradePnl >= 0 ? '#00C896' : '#FF4D5E'}
-                    stroke="#111A2E"
+                    fill={d.tradePnl >= 0 ? '#10B981' : '#EF4444'}
+                    stroke="currentColor"
+                    className="text-white dark:text-zinc-950 cursor-pointer transition-all hover:scale-150"
                     strokeWidth="1.5"
-                    className="cursor-pointer transition-all hover:scale-150"
                     onMouseEnter={() =>
                       setHoveredPoint({
                         date: d.date,
@@ -408,16 +402,16 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onSelectJournalDay
             {/* Hover Tooltip */}
             {hoveredPoint && (
               <div
-                className="absolute pointer-events-none bg-[#0B1220] border border-[#2F80FF] text-white px-2.5 py-1.5 rounded-lg text-xs font-mono shadow-xl z-20"
+                className="absolute pointer-events-none bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 px-2.5 py-1.5 rounded-lg text-xs font-mono shadow-xl z-20"
                 style={{
                   left: `${(hoveredPoint.x / chartWidth) * 100}%`,
                   top: `${(hoveredPoint.y / chartHeight) * 100}%`,
                   transform: 'translate(-50%, -125%)',
                 }}
               >
-                <div className="font-bold text-[#2F80FF]">{hoveredPoint.symbol} · {hoveredPoint.date}</div>
-                <div className="text-slate-300">
-                  Trade P&L: <span className={hoveredPoint.tradePnl >= 0 ? 'text-[#00C896]' : 'text-[#FF4D5E]'}>${hoveredPoint.tradePnl.toFixed(2)}</span>
+                <div className="font-bold text-emerald-400 dark:text-emerald-600">{hoveredPoint.symbol} · {hoveredPoint.date}</div>
+                <div>
+                  Trade P&L: <span className={hoveredPoint.tradePnl >= 0 ? 'text-emerald-400 dark:text-emerald-600' : 'text-red-400'}>${hoveredPoint.tradePnl.toFixed(2)}</span>
                 </div>
                 <div>Equity: ${hoveredPoint.equity.toFixed(2)}</div>
               </div>
@@ -429,30 +423,30 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onSelectJournalDay
       {/* Row: Calendar Heatmap & P&L per Instrument */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Calendar Heatmap */}
-        <div className="bg-[#111A2E] border border-[#1E2B45] rounded-xl p-5 shadow-lg">
+        <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm transition-colors">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-[#2F80FF]" />
+              <h3 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider font-mono flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 <span>Calendar Heatmap</span>
               </h3>
-              <p className="text-xs text-slate-400">Green = Profit, Red = Drawdown. Click to jump to journal day.</p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">Green = Profit, Red = Drawdown. Click to jump to day.</p>
             </div>
 
             <div className="flex items-center gap-1.5">
               <button
                 onClick={handlePrevMonth}
-                className="p-1 text-slate-300 hover:text-white hover:bg-[#16223B] border border-[#1E2B45] rounded-md transition-colors"
+                className="p-1 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 rounded-lg transition-colors cursor-pointer"
                 title="Previous Month"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <span className="text-xs font-semibold text-white font-mono px-2">
+              <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 font-mono px-2">
                 {monthName}
               </span>
               <button
                 onClick={handleNextMonth}
-                className="p-1 text-slate-300 hover:text-white hover:bg-[#16223B] border border-[#1E2B45] rounded-md transition-colors"
+                className="p-1 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 rounded-lg transition-colors cursor-pointer"
                 title="Next Month"
               >
                 <ChevronRight className="w-4 h-4" />
@@ -461,7 +455,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onSelectJournalDay
           </div>
 
           {/* Weekday headers */}
-          <div className="grid grid-cols-7 gap-1.5 mb-1.5 text-center text-[10px] font-mono text-slate-500 uppercase">
+          <div className="grid grid-cols-7 gap-1.5 mb-1.5 text-center text-[10px] font-mono text-zinc-400 uppercase">
             <span>Mon</span>
             <span>Tue</span>
             <span>Wed</span>
@@ -475,7 +469,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onSelectJournalDay
           <div className="grid grid-cols-7 gap-1.5">
             {/* Empty offset padding cells */}
             {Array.from({ length: heatmapMonthData.firstDayIndex }).map((_, i) => (
-              <div key={`offset-${i}`} className="aspect-square rounded-md bg-[#0B1220]/20" />
+              <div key={`offset-${i}`} className="aspect-square rounded-lg bg-zinc-50 dark:bg-[#18181B]/40" />
             ))}
 
             {/* Month Day Cells */}
@@ -484,19 +478,19 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onSelectJournalDay
               const isProfit = day.pnl > 0;
               const isLoss = day.pnl < 0;
 
-              let cellBg = 'bg-[#16223B]/40 hover:bg-[#16223B] text-slate-400 border border-[#1E2B45]/40';
-              let textColor = 'text-slate-400';
+              let cellBg = 'bg-zinc-50 dark:bg-[#18181B] hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 border border-zinc-200/60 dark:border-zinc-800';
+              let textColor = 'text-zinc-500 dark:text-zinc-400';
 
               if (hasTrades) {
                 if (isProfit) {
-                  cellBg = 'bg-[#00C896]/20 border border-[#00C896]/50 hover:bg-[#00C896]/30';
-                  textColor = 'text-[#00C896] font-bold';
+                  cellBg = 'bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/50';
+                  textColor = 'text-emerald-700 dark:text-emerald-400 font-bold';
                 } else if (isLoss) {
-                  cellBg = 'bg-[#FF4D5E]/20 border border-[#FF4D5E]/50 hover:bg-[#FF4D5E]/30';
-                  textColor = 'text-[#FF4D5E] font-bold';
+                  cellBg = 'bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-700/60 hover:bg-red-100 dark:hover:bg-red-900/50';
+                  textColor = 'text-red-700 dark:text-red-400 font-bold';
                 } else {
-                  cellBg = 'bg-[#F59E0B]/20 border border-[#F59E0B]/50 hover:bg-[#F59E0B]/30';
-                  textColor = 'text-[#F59E0B] font-bold';
+                  cellBg = 'bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 hover:bg-amber-100';
+                  textColor = 'text-amber-700 dark:text-amber-400 font-bold';
                 }
               }
 
@@ -505,7 +499,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onSelectJournalDay
                   key={day.dateString}
                   onClick={() => onSelectJournalDay(day.dateString)}
                   title={`${day.dateString}: ${day.tradeCount} trades, P&L: $${day.pnl.toFixed(2)}`}
-                  className={`aspect-square rounded-lg p-1 flex flex-col justify-between items-center transition-all cursor-pointer ${cellBg}`}
+                  className={`aspect-square rounded-xl p-1 flex flex-col justify-between items-center transition-all cursor-pointer ${cellBg}`}
                 >
                   <span className={`text-[10px] font-mono self-start ${textColor}`}>
                     {day.dayNumber}
@@ -518,7 +512,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onSelectJournalDay
                   )}
 
                   {day.completed && (
-                    <div className="w-1.5 h-1.5 rounded-full bg-[#00C896] self-end mt-auto" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 self-end mt-auto" />
                   )}
                 </button>
               );
@@ -527,24 +521,23 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onSelectJournalDay
         </div>
 
         {/* P&L per Instrument Chart */}
-        <div className="bg-[#111A2E] border border-[#1E2B45] rounded-xl p-5 shadow-lg flex flex-col">
+        <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm flex flex-col transition-colors">
           <div className="mb-4">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono flex items-center gap-2">
-              <BarChart2 className="w-4 h-4 text-[#2F80FF]" />
+            <h3 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider font-mono flex items-center gap-2">
+              <BarChart2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               <span>P&L by Instrument</span>
             </h3>
-            <p className="text-xs text-slate-400">Total net dollar returns grouped by asset</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">Total net dollar returns grouped by asset</p>
           </div>
 
           {instrumentPnlBreakdown.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-[#1E2B45] rounded-lg text-slate-500 text-xs p-8">
+            <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-400 text-xs p-8">
               <span>No trade records available yet to display per-instrument performance.</span>
             </div>
           ) : (
             <div className="space-y-3 overflow-y-auto max-h-72 pr-1">
               {instrumentPnlBreakdown.map((item) => {
                 const isPositive = item.pnl >= 0;
-                // Calculate percentage of max for bar width
                 const maxAbs = Math.max(...instrumentPnlBreakdown.map((i) => Math.abs(i.pnl))) || 1;
                 const barWidth = Math.min(100, Math.max(8, (Math.abs(item.pnl) / maxAbs) * 100));
 
@@ -552,24 +545,24 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ onSelectJournalDay
                   <div key={item.symbol} className="space-y-1">
                     <div className="flex items-center justify-between text-xs font-mono">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-white">{item.symbol}</span>
-                        <span className="text-[10px] text-slate-500">
+                        <span className="font-bold text-zinc-900 dark:text-white">{item.symbol}</span>
+                        <span className="text-[10px] text-zinc-500">
                           {item.count} trade{item.count !== 1 ? 's' : ''} ({item.wins}W)
                         </span>
                       </div>
                       <span
                         className={`font-bold tabular-nums ${
-                          isPositive ? 'text-[#00C896]' : 'text-[#FF4D5E]'
+                          isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
                         }`}
                       >
                         {isPositive ? '+' : ''}${item.pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
 
-                    <div className="h-2 w-full bg-[#0B1220] rounded-full overflow-hidden flex">
+                    <div className="h-2 w-full bg-zinc-100 dark:bg-[#18181B] rounded-full overflow-hidden flex">
                       <div
                         className={`h-full rounded-full transition-all duration-300 ${
-                          isPositive ? 'bg-[#00C896]' : 'bg-[#FF4D5E]'
+                          isPositive ? 'bg-emerald-500' : 'bg-red-500'
                         }`}
                         style={{ width: `${barWidth}%` }}
                       />

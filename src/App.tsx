@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastProvider } from './components/common/Toast';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { JournalProvider, useJournal } from './contexts/JournalContext';
@@ -13,7 +14,7 @@ import { AddTradeModal } from './components/trades/AddTradeModal';
 import { TradeDetailModal } from './components/trades/TradeDetailModal';
 import { ConfigModal } from './components/common/ConfigModal';
 import { Trade } from './types';
-import { Activity, AlertCircle, RefreshCw } from 'lucide-react';
+import { AlertCircle, TrendingUp } from 'lucide-react';
 
 const MainApp: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
@@ -28,14 +29,14 @@ const MainApp: React.FC = () => {
   // Splash Loading Screen
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-[#0B1220] flex flex-col items-center justify-center p-4">
-        <div className="w-12 h-12 rounded-2xl bg-[#111A2E] border border-[#1E2B45] flex items-center justify-center text-[#2F80FF] mb-4 shadow-xl">
-          <Activity className="w-6 h-6 animate-pulse" />
+      <div className="min-h-screen bg-zinc-50 dark:bg-[#09090B] text-zinc-900 dark:text-white flex flex-col items-center justify-center p-4 transition-colors">
+        <div className="w-12 h-12 rounded-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-4 shadow-sm">
+          <TrendingUp className="w-6 h-6 stroke-[2.5] animate-pulse" />
         </div>
-        <div className="text-sm font-semibold text-white font-mono">
+        <div className="text-sm font-semibold text-zinc-900 dark:text-white font-mono">
           Initializing Jefextech Journal...
         </div>
-        <p className="text-xs text-slate-500 mt-1 font-mono">
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 font-mono">
           Connecting to Supabase instance
         </p>
       </div>
@@ -59,7 +60,7 @@ const MainApp: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0B1220] text-white flex flex-col pb-24 md:pb-12">
+    <div className="min-h-screen bg-zinc-50 dark:bg-[#09090B] text-zinc-900 dark:text-zinc-100 flex flex-col pb-24 md:pb-12 transition-colors">
       {/* Top Navbar */}
       <Navbar
         currentTab={currentTab}
@@ -74,16 +75,16 @@ const MainApp: React.FC = () => {
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {journalError && (
-          <div className="mb-6 p-4 rounded-xl bg-[#16223B] border border-[#F59E0B]/40 flex items-center justify-between gap-3 text-xs text-slate-200">
+          <div className="mb-6 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 flex items-center justify-between gap-3 text-xs text-amber-900 dark:text-amber-300">
             <div className="flex items-center gap-2.5">
-              <AlertCircle className="w-4 h-4 text-[#F59E0B] shrink-0" />
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
               <span>
                 Supabase sync notice: {journalError}. If you haven't run the SQL schema yet, open settings to copy it.
               </span>
             </div>
             <button
               onClick={() => setIsConfigOpen(true)}
-              className="px-3 py-1 bg-[#0B1220] hover:bg-[#1C2A48] border border-[#1E2B45] rounded text-xs text-white shrink-0 font-medium"
+              className="px-3 py-1 bg-white dark:bg-[#121215] hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-amber-300 dark:border-amber-700 rounded-lg text-xs text-zinc-900 dark:text-white shrink-0 font-medium cursor-pointer"
             >
               View SQL Schema
             </button>
@@ -164,12 +165,14 @@ const MainApp: React.FC = () => {
 
 export default function App() {
   return (
-    <ToastProvider>
-      <AuthProvider>
-        <JournalProvider>
-          <MainApp />
-        </JournalProvider>
-      </AuthProvider>
-    </ToastProvider>
+    <ThemeProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <JournalProvider>
+            <MainApp />
+          </JournalProvider>
+        </AuthProvider>
+      </ToastProvider>
+    </ThemeProvider>
   );
 }

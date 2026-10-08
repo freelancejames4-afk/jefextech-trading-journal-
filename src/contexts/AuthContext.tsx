@@ -26,6 +26,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isConfigured, setIsConfigured] = useState(isSupabaseConfigured());
   const [isDemoUser, setIsDemoUser] = useState(false);
 
+  const currentUserIdRef = React.useRef<string | null>(null);
+
   // Auto-seed starter instruments for new users if none exist
   const checkStarterInstruments = async (userId: string) => {
     try {
@@ -59,8 +61,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const storedDemo = localStorage.getItem('jefextech_demo_user');
       if (storedDemo) {
         setIsDemoUser(true);
-        setUser(JSON.parse(storedDemo));
+        const parsed = JSON.parse(storedDemo);
+        currentUserIdRef.current = parsed.id;
+        setUser(parsed);
       } else {
+        currentUserIdRef.current = null;
         setUser(null);
       }
       setLoading(false);
@@ -72,6 +77,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data, error } = await client.auth.getSession();
       if (!error && data?.session) {
         setSession(data.session);
+        currentUserIdRef.current = data.session.user.id;
         setUser(data.session.user);
         setIsDemoUser(false);
         checkStarterInstruments(data.session.user.id);
@@ -81,8 +87,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const storedDemo = localStorage.getItem('jefextech_demo_user');
         if (storedDemo) {
           setIsDemoUser(true);
-          setUser(JSON.parse(storedDemo));
+          const parsed = JSON.parse(storedDemo);
+          currentUserIdRef.current = parsed.id;
+          setUser(parsed);
         } else {
+          currentUserIdRef.current = null;
           setUser(null);
         }
       }
@@ -100,14 +109,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const client = getSupabaseClient();
       const { data: authListener } = client.auth.onAuthStateChange(
         async (event, currentSession) => {
+          // Ignore TOKEN_REFRESHED completely - do not reload or unmount UI
+          if (event === 'TOKEN_REFRESHED') {
+            setSession(currentSession);
+            return;
+          }
+
+          const newUserId = currentSession?.user?.id ?? null;
+
+          // Ignore repeated SIGNED_IN if user ID is the same
+          if (event === 'SIGNED_IN' && newUserId === currentUserIdRef.current) {
+            setSession(currentSession);
+            return;
+          }
+
+          // Only update UI if user identity actually changed or signed out
+          currentUserIdRef.current = newUserId;
           setSession(currentSession);
           setUser(currentSession?.user ?? null);
+
           if (currentSession?.user) {
             setIsDemoUser(false);
             localStorage.removeItem('jefextech_demo_user');
             checkStarterInstruments(currentSession.user.id);
           }
-          setLoading(false);
         }
       );
 

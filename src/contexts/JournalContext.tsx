@@ -93,7 +93,11 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return;
     }
 
-    setLoading(true);
+    // Only set loading to true on initial load if we don't have instruments yet
+    setInstruments((prev) => {
+      if (prev.length === 0) setLoading(true);
+      return prev;
+    });
     setError(null);
 
     // If demo mode or Supabase not configured, use local storage engine
@@ -177,7 +181,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   useEffect(() => {
     refreshData();
-  }, [refreshData]);
+  }, [user?.id, isDemoUser]);
 
   // Current journal day object
   const currentJournalDay = useMemo(() => {

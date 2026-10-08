@@ -11,15 +11,13 @@ import {
   X,
   AlertTriangle,
   RotateCcw,
-  CheckCircle2,
-  TrendingUp,
 } from 'lucide-react';
 
 interface InstrumentsViewProps {
   onSelectInstrument?: (instrumentId: string) => void;
 }
 
-export const InstrumentsView: React.FC<InstrumentsViewProps> = ({ onSelectInstrument }) => {
+export const InstrumentsView: React.FC<InstrumentsViewProps> = () => {
   const {
     instruments,
     trades,
@@ -66,7 +64,7 @@ export const InstrumentsView: React.FC<InstrumentsViewProps> = ({ onSelectInstru
         showToast(`Instrument ${symbol.toUpperCase()} updated.`, 'success');
       } else {
         await addInstrument(symbol, name, marketType);
-        showToast(`Instrument ${symbol.toUpperCase()} added to your portfolio!`, 'success');
+        showToast(`Instrument ${symbol.toUpperCase()} added to portfolio!`, 'success');
       }
       setIsModalOpen(false);
     } catch (err: any) {
@@ -94,7 +92,6 @@ export const InstrumentsView: React.FC<InstrumentsViewProps> = ({ onSelectInstru
     }
   };
 
-  // Compute metrics per instrument from real trades
   const getInstrumentStats = (instId: string) => {
     const instTrades = trades.filter((t) => t.instrument_id === instId);
     let netPnl = 0;
@@ -120,10 +117,10 @@ export const InstrumentsView: React.FC<InstrumentsViewProps> = ({ onSelectInstru
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">
+          <h2 className="text-xl font-bold text-zinc-900 dark:text-white tracking-tight">
             Trading Instruments
           </h2>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
             Manage your watched currency pairs, cryptos, and commodities
           </p>
         </div>
@@ -131,18 +128,18 @@ export const InstrumentsView: React.FC<InstrumentsViewProps> = ({ onSelectInstru
         <div className="flex items-center gap-2.5">
           <button
             onClick={handleRestoreStarter}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white bg-[#16223B] hover:bg-[#1C2A48] border border-[#1E2B45] rounded-lg transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white bg-white dark:bg-[#121215] hover:bg-zinc-100 dark:hover:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors cursor-pointer"
             title="Restore Starter List (BTC, ETH, SOL, HYPE, XAUUSD, EURUSD)"
           >
-            <RotateCcw className="w-3.5 h-3.5 text-[#2F80FF]" />
+            <RotateCcw className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
             <span className="hidden sm:inline">Add Defaults</span>
           </button>
 
           <button
             onClick={openAddModal}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-[#2F80FF] hover:bg-[#2F80FF]/90 rounded-lg shadow-lg shadow-[#2F80FF]/25 active:scale-95 transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-sm active:scale-95 transition-all cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4 stroke-[2.5]" />
             <span>+ Add Instrument</span>
           </button>
         </div>
@@ -150,21 +147,21 @@ export const InstrumentsView: React.FC<InstrumentsViewProps> = ({ onSelectInstru
 
       {/* Instruments Grid */}
       {instruments.length === 0 ? (
-        <div className="bg-[#111A2E] border border-[#1E2B45] rounded-xl p-10 text-center">
-          <div className="w-12 h-12 rounded-xl bg-[#16223B] border border-[#1E2B45] flex items-center justify-center mx-auto mb-3 text-slate-500">
+        <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-10 text-center transition-colors">
+          <div className="w-12 h-12 rounded-xl bg-zinc-100 dark:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 flex items-center justify-center mx-auto mb-3 text-zinc-400">
             <Coins className="w-6 h-6" />
           </div>
-          <h3 className="text-sm font-semibold text-white mb-1">
+          <h3 className="text-sm font-semibold text-zinc-900 dark:text-white mb-1">
             No Instruments Configured
           </h3>
-          <p className="text-xs text-slate-400 max-w-sm mx-auto mb-4">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto mb-4">
             Add your favorite crypto pairs, forex pairs, or commodities to start logging trades.
           </p>
           <button
             onClick={handleRestoreStarter}
-            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-[#2F80FF] hover:bg-[#2F80FF]/90 rounded-lg shadow-lg shadow-[#2F80FF]/25 transition-all cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-sm transition-all cursor-pointer"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="w-4 h-4 stroke-[2.5]" />
             <span>Load Starter Instruments</span>
           </button>
         </div>
@@ -178,20 +175,20 @@ export const InstrumentsView: React.FC<InstrumentsViewProps> = ({ onSelectInstru
             return (
               <div
                 key={inst.id}
-                className="group relative bg-[#111A2E] hover:bg-[#16223B] border border-[#1E2B45] hover:border-[#2F80FF]/40 rounded-xl p-5 transition-all shadow-sm flex flex-col justify-between"
+                className="group relative bg-white dark:bg-[#121215] hover:bg-zinc-50/70 dark:hover:bg-[#16161A] border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 rounded-2xl p-5 transition-all shadow-sm flex flex-col justify-between"
               >
                 <div>
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-lg font-bold font-mono text-white tracking-tight group-hover:text-[#2F80FF] transition-colors">
+                        <span className="text-lg font-bold font-mono text-zinc-900 dark:text-white tracking-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                           {inst.symbol}
                         </span>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-[#0B1220] border border-[#1E2B45] text-slate-300">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-zinc-100 dark:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400">
                           {inst.market_type}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-400 mt-0.5">
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                         {inst.name}
                       </p>
                     </div>
@@ -199,14 +196,14 @@ export const InstrumentsView: React.FC<InstrumentsViewProps> = ({ onSelectInstru
                     <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => openEditModal(inst)}
-                        className="p-1.5 text-slate-400 hover:text-white hover:bg-[#0B1220] rounded-md transition-colors"
+                        className="p-1.5 text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
                         title="Edit instrument"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => setDeleteTarget(inst)}
-                        className="p-1.5 text-slate-400 hover:text-[#FF4D5E] hover:bg-[#FF4D5E]/10 rounded-md transition-colors"
+                        className="p-1.5 text-zinc-400 hover:text-red-600 dark:hover:text-rose-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors cursor-pointer"
                         title="Delete instrument"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -215,28 +212,28 @@ export const InstrumentsView: React.FC<InstrumentsViewProps> = ({ onSelectInstru
                   </div>
 
                   {/* Instrument Stats */}
-                  <div className="grid grid-cols-3 gap-2 py-3 px-3 bg-[#0B1220]/60 rounded-lg border border-[#1E2B45]/60 mt-3 text-xs font-mono">
+                  <div className="grid grid-cols-3 gap-2 py-3 px-3 bg-zinc-50 dark:bg-[#18181B] rounded-xl border border-zinc-200 dark:border-zinc-800 mt-3 text-xs font-mono">
                     <div>
-                      <span className="text-[10px] text-slate-500 uppercase block">Trades</span>
-                      <span className="text-white font-medium tabular-nums">
+                      <span className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase block">Trades</span>
+                      <span className="text-zinc-900 dark:text-white font-medium tabular-nums">
                         {stats.tradesCount}
                       </span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-500 uppercase block">Win %</span>
-                      <span className="text-[#2F80FF] font-medium tabular-nums">
+                      <span className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase block">Win %</span>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-medium tabular-nums">
                         {stats.tradesCount > 0 ? `${stats.winRate.toFixed(0)}%` : '—'}
                       </span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-500 uppercase block">Net P&L</span>
+                      <span className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase block">Net P&L</span>
                       <span
                         className={`font-bold tabular-nums ${
                           isProfit
-                            ? 'text-[#00C896]'
+                            ? 'text-emerald-600 dark:text-emerald-400'
                             : isLoss
-                            ? 'text-[#FF4D5E]'
-                            : 'text-slate-400'
+                            ? 'text-red-600 dark:text-red-400'
+                            : 'text-zinc-400'
                         }`}
                       >
                         {stats.netPnl > 0 ? '+' : ''}${stats.netPnl.toFixed(0)}
@@ -245,9 +242,9 @@ export const InstrumentsView: React.FC<InstrumentsViewProps> = ({ onSelectInstru
                   </div>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-[#1E2B45]/60 flex items-center justify-between text-[11px] text-slate-500">
+                <div className="mt-4 pt-3 border-t border-zinc-200/60 dark:border-zinc-800/60 flex items-center justify-between text-[11px] text-zinc-400">
                   <span>Available in Add Trade</span>
-                  <span className="font-mono text-[#2F80FF]">Active</span>
+                  <span className="font-mono text-emerald-600 dark:text-emerald-400 font-medium">Active</span>
                 </div>
               </div>
             );
@@ -257,15 +254,15 @@ export const InstrumentsView: React.FC<InstrumentsViewProps> = ({ onSelectInstru
 
       {/* Add / Edit Instrument Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="relative w-full max-w-md bg-[#111A2E] border border-[#1E2B45] rounded-xl shadow-2xl p-6">
-            <div className="flex items-center justify-between pb-3 border-b border-[#1E2B45] mb-4">
-              <h3 className="text-base font-bold text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="relative w-full max-w-md bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-6">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800 mb-4">
+              <h3 className="text-base font-bold text-zinc-900 dark:text-white">
                 {editingInstrument ? 'Edit Instrument' : '+ Add New Instrument'}
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-md"
+                className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white p-1 rounded-md cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -273,7 +270,7 @@ export const InstrumentsView: React.FC<InstrumentsViewProps> = ({ onSelectInstru
 
             <form onSubmit={handleSave} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
                   Ticker / Symbol (e.g. BTC, XAUUSD, EURUSD)
                 </label>
                 <input
@@ -282,12 +279,12 @@ export const InstrumentsView: React.FC<InstrumentsViewProps> = ({ onSelectInstru
                   onChange={(e) => setSymbol(e.target.value.toUpperCase())}
                   placeholder="BTC"
                   required
-                  className="w-full bg-[#16223B] border border-[#1E2B45] focus:border-[#2F80FF] text-white px-3 py-2 rounded-lg text-sm font-mono uppercase outline-none"
+                  className="w-full bg-zinc-50 dark:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 focus:border-emerald-500 text-zinc-900 dark:text-white px-3 py-2 rounded-xl text-sm font-mono uppercase outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
                   Full Name / Description
                 </label>
                 <input
@@ -296,38 +293,38 @@ export const InstrumentsView: React.FC<InstrumentsViewProps> = ({ onSelectInstru
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Bitcoin / US Dollar"
                   required
-                  className="w-full bg-[#16223B] border border-[#1E2B45] focus:border-[#2F80FF] text-white px-3 py-2 rounded-lg text-sm outline-none"
+                  className="w-full bg-zinc-50 dark:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 focus:border-emerald-500 text-zinc-900 dark:text-white px-3 py-2 rounded-xl text-sm outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
                   Asset Market Type
                 </label>
                 <select
                   value={marketType}
                   onChange={(e) => setMarketType(e.target.value as MarketType)}
-                  className="w-full bg-[#16223B] border border-[#1E2B45] focus:border-[#2F80FF] text-white px-3 py-2 rounded-lg text-sm outline-none cursor-pointer"
+                  className="w-full bg-zinc-50 dark:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 focus:border-emerald-500 text-zinc-900 dark:text-white px-3 py-2 rounded-xl text-sm outline-none cursor-pointer"
                 >
                   {MARKET_TYPES.map((m) => (
-                    <option key={m} value={m} className="bg-[#111A2E] text-white">
+                    <option key={m} value={m} className="bg-white dark:bg-[#121215] text-zinc-900 dark:text-white">
                       {m}
                     </option>
                   ))}
                 </select>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#1E2B45]">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-800">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-xs font-medium text-slate-300 hover:text-white bg-[#16223B] border border-[#1E2B45] rounded-lg"
+                  className="px-4 py-2 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white bg-zinc-100 dark:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 rounded-xl cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 text-xs font-semibold text-white bg-[#2F80FF] hover:bg-[#2F80FF]/90 rounded-lg shadow-lg shadow-[#2F80FF]/25"
+                  className="px-5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-sm cursor-pointer"
                 >
                   {editingInstrument ? 'Save Changes' : 'Add Instrument'}
                 </button>
@@ -339,27 +336,27 @@ export const InstrumentsView: React.FC<InstrumentsViewProps> = ({ onSelectInstru
 
       {/* Delete Confirmation Modal */}
       {deleteTarget && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-[#111A2E] border border-[#FF4D5E]/40 rounded-xl p-6 max-w-sm w-full shadow-2xl">
-            <div className="w-10 h-10 rounded-full bg-[#FF4D5E]/15 text-[#FF4D5E] flex items-center justify-center mb-3">
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white dark:bg-[#121215] border border-red-200 dark:border-red-900/40 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <div className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 flex items-center justify-center mb-3">
               <AlertTriangle className="w-5 h-5" />
             </div>
-            <h3 className="text-base font-bold text-white mb-1">
+            <h3 className="text-base font-bold text-zinc-900 dark:text-white mb-1">
               Delete {deleteTarget.symbol}?
             </h3>
-            <p className="text-xs text-slate-400 mb-5 leading-relaxed">
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-5 leading-relaxed">
               Are you sure you want to remove this instrument? Existing trades referencing it will remain intact.
             </p>
             <div className="flex items-center justify-end gap-3">
               <button
                 onClick={() => setDeleteTarget(null)}
-                className="px-3.5 py-2 text-xs font-medium text-slate-300 hover:text-white bg-[#16223B] border border-[#1E2B45] rounded-lg"
+                className="px-3.5 py-2 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white bg-zinc-100 dark:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 rounded-xl cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDelete}
-                className="px-4 py-2 text-xs font-semibold text-white bg-[#FF4D5E] hover:bg-[#FF4D5E]/90 rounded-lg shadow-lg shadow-[#FF4D5E]/20"
+                className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-500 rounded-xl shadow-sm cursor-pointer"
               >
                 Delete
               </button>
