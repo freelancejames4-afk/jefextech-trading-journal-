@@ -4,7 +4,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../common/Toast';
 import { uploadTradeScreenshot } from '../../lib/supabase';
 import { TRADING_SESSIONS, TRADING_STRATEGIES, TRADING_EMOTIONS } from '../../lib/constants';
-import { Trade, TradeDirection, TradeResult } from '../../types';
+import { Trade, TradeDirection, TradeResult, Instrument } from '../../types';
+import { getEvaluationForSymbol } from '../../lib/tradingSessions';
 import {
   X,
   UploadCloud,
@@ -18,6 +19,12 @@ import {
   AlertCircle,
   RotateCcw,
   Loader2,
+  ShieldCheck,
+  Search,
+  ChevronDown,
+  Clock,
+  Sparkles,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface AddTradeModalProps {
@@ -43,6 +50,8 @@ interface TradeDraftData {
   emotion: string;
   notes: string;
   screenshotUrls: string[];
+  rulesFollowed: number[];
+  tradedInBestTime?: boolean;
   updatedAt?: number;
 }
 
@@ -61,7 +70,7 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({
   defaultInstrumentId,
   onAddInstrumentShortcut,
 }) => {
-  const { instruments, addTrade, updateTrade } = useJournal();
+  const { instruments, tradingRules, bestTimesOverrides, addTrade, updateTrade } = useJournal();
   const { user } = useAuth();
   const { showToast } = useToast();
 
@@ -84,6 +93,16 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({
   const [emotion, setEmotion] = useState<string>('Disciplined');
   const [notes, setNotes] = useState<string>('');
   const [screenshotUrls, setScreenshotUrls] = useState<string[]>([]);
+  const [rulesFollowed, setRulesFollowed] = useState<number[]>([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
+  // Best time states
+  const [tradedInBestTime, setTradedInBestTime] = useState<boolean>(false);
+  const [acknowledgedWarning, setAcknowledgedWarning] = useState<boolean>(false);
+
+  // Searchable instrument picker dropdown state
+  const [isInstrumentDropdownOpen, setIsInstrumentDropdownOpen] = useState(false);
+  const [instrumentSearch, setInstrumentSearch] = useState('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Async upload tracking state for individual images
   const [uploadingImages, setUploadingImages] = useState<UploadingImageItem[]>([]);
@@ -126,6 +145,9 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({
       setEmotion(tradeToEdit.emotion || 'Disciplined');
       setNotes(tradeToEdit.notes || '');
       setScreenshotUrls(tradeToEdit.screenshot_urls || []);
+      setRulesFollowed(tradeToEdit.rules_followed || [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+      setTradedInBestTime(tradeToEdit.traded_in_best_time ?? false);
+      setAcknowledgedWarning(true);
       setUploadingImages([]);
       setDraftStatus('idle');
       return;
@@ -147,6 +169,11 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({
       setEmotion(draft.emotion || 'Disciplined');
       setNotes(draft.notes || '');
       setScreenshotUrls(draft.screenshotUrls || []);
+      setRulesFollowed(
+        Array.isArray(draft.rulesFollowed) ? draft.rulesFollowed : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+      );
+      setTradedInBestTime(draft.tradedInBestTime ?? false);
+      setAcknowledgedWarning(false);
       setUploadingImages([]);
       setDraftStatus('saved');
       if (draft.updatedAt) {
@@ -169,6 +196,9 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({
       setEmotion('Disciplined');
       setNotes('');
       setScreenshotUrls([]);
+      setRulesFollowed([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+      setTradedInBestTime(false);
+      setAcknowledgedWarning(false);
       setUploadingImages([]);
       setDraftStatus('idle');
       setDraftSavedAt(null);
@@ -180,6 +210,8 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({
       initForm();
       isInitializedRef.current = true;
       setSaveError(null);
+      setIsInstrumentDropdownOpen(false);
+      setInstrumentSearch('');
     } else {
       isInitializedRef.current = false;
     }
@@ -190,6 +222,39 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({
       setInstrumentId(defaultInstrumentId || instruments[0].id);
     }
   }, [isOpen, instrumentId, instruments, defaultInstrumentId]);
+
+  // Click outside to close instrument search dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsInstrumentDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedInstrument = useMemo(() => {
+    return instruments.find((i) => i.id === instrumentId);
+  }, [instruments, instrumentId]);
+
+  // Evaluate Prime Best Time Window for Selected Instrument
+  const bestTimeEval = useMemo(() => {
+    if (!selectedInstrument) return null;
+    return getEvaluationForSymbol(selectedInstrument.symbol, new Date(), bestTimesOverrides);
+  }, [selectedInstrument, bestTimesOverrides]);
+
+  // Sync tradedInBestTime automatically with evaluation (unless editing existing trade)
+  useEffect(() => {
+    if (!tradeToEdit && bestTimeEval) {
+      setTradedInBestTime(bestTimeEval.isCurrentlyPrime);
+      if (bestTimeEval.status === 'good') {
+        setAcknowledgedWarning(true);
+      } else {
+        setAcknowledgedWarning(false);
+      }
+    }
+  }, [selectedInstrument?.id, bestTimeEval?.status, tradeToEdit]);
 
   // 1. AUTO-SAVE DRAFT (Debounced 500ms)
   useEffect(() => {
@@ -218,6 +283,8 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({
         emotion,
         notes,
         screenshotUrls,
+        rulesFollowed,
+        tradedInBestTime,
         updatedAt: now,
       };
 
@@ -256,6 +323,8 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({
     emotion,
     notes,
     screenshotUrls,
+    rulesFollowed,
+    tradedInBestTime,
   ]);
 
   const handleDiscardDraft = () => {
@@ -280,6 +349,9 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({
     setEmotion('Disciplined');
     setNotes('');
     setScreenshotUrls([]);
+    setRulesFollowed([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    setTradedInBestTime(false);
+    setAcknowledgedWarning(false);
     setUploadingImages([]);
     setDraftStatus('idle');
     setDraftSavedAt(null);
@@ -415,6 +487,53 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({
     showToast(`Estimated P&L calculated: $${rounded}`, 'info');
   };
 
+  const toggleRuleFollowed = (ruleNumber: number) => {
+    setRulesFollowed((prev) =>
+      prev.includes(ruleNumber) ? prev.filter((n) => n !== ruleNumber) : [...prev, ruleNumber]
+    );
+  };
+
+  const handleSelectAllRules = () => {
+    setRulesFollowed([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  };
+
+  const handleClearAllRules = () => {
+    setRulesFollowed([]);
+  };
+
+  // Group and filter instruments
+  const filteredInstruments = useMemo(() => {
+    const q = instrumentSearch.trim().toLowerCase();
+    return instruments.filter(
+      (inst) =>
+        inst.symbol.toLowerCase().includes(q) ||
+        inst.name.toLowerCase().includes(q) ||
+        inst.market_type.toLowerCase().includes(q)
+    );
+  }, [instruments, instrumentSearch]);
+
+  const groupedInstruments = useMemo(() => {
+    const groups: { [key: string]: Instrument[] } = {
+      Forex: [],
+      'Commodity/Indices': [],
+      Crypto: [],
+      Other: [],
+    };
+
+    filteredInstruments.forEach((inst) => {
+      const type = inst.market_type;
+      if (groups[type]) {
+        groups[type].push(inst);
+      } else if (type === 'Commodity' || type === 'Indices') {
+        groups['Commodity/Indices'].push(inst);
+      } else {
+        groups.Other.push(inst);
+      }
+    });
+
+    return groups;
+  }, [filteredInstruments]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaveError(null);
@@ -461,6 +580,8 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({
           emotion,
           notes,
           screenshot_urls: screenshotUrls,
+          rules_followed: rulesFollowed,
+          traded_in_best_time: tradedInBestTime,
         });
         showToast('Trade record updated successfully!', 'success');
       } else {
@@ -480,6 +601,8 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({
           emotion,
           notes,
           screenshot_urls: screenshotUrls,
+          rules_followed: rulesFollowed,
+          traded_in_best_time: tradedInBestTime,
         });
 
         try {
@@ -591,15 +714,89 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
+          {/* Best Time Card Check Before I Trade */}
+          {selectedInstrument && bestTimeEval && (
+            <div className={`p-3.5 rounded-2xl border transition-all ${
+              bestTimeEval.status === 'good'
+                ? 'bg-emerald-50/60 dark:bg-emerald-950/25 border-emerald-300 dark:border-emerald-800/60'
+                : bestTimeEval.status === 'weekend_closed'
+                ? 'bg-rose-50/60 dark:bg-rose-950/25 border-rose-300 dark:border-rose-800/60'
+                : 'bg-zinc-100/70 dark:bg-[#18181B] border-zinc-200 dark:border-zinc-800'
+            }`}>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Clock className={`w-4 h-4 ${
+                      bestTimeEval.status === 'good' ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400'
+                    }`} />
+                    <span className="text-xs font-bold text-zinc-900 dark:text-white">
+                      Best time for {selectedInstrument.symbol}:
+                    </span>
+                    <span className="text-xs font-mono font-semibold text-zinc-800 dark:text-zinc-200">
+                      {bestTimeEval.lagosWindowStrings.join(' and ')} (Nigerian time)
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                    {bestTimeEval.sessionDescription}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                  {bestTimeEval.status === 'good' ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 font-mono text-[11px] font-bold">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>Good time now</span>
+                    </span>
+                  ) : bestTimeEval.status === 'weekend_closed' ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-100 dark:bg-rose-950/70 text-rose-800 dark:text-rose-400 font-mono text-[11px] font-bold">
+                      <span>Weekend Closed</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-zinc-200/80 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-mono text-[11px] font-medium">
+                      <span>Off hours</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Gentle warning if off hours / weekend, without blocking */}
+              {bestTimeEval.status !== 'good' && !acknowledgedWarning && (
+                <div className="mt-3 pt-3 border-t border-zinc-200/60 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-amber-800 dark:text-amber-300 bg-amber-500/10 p-2.5 rounded-xl border-amber-300/40">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>
+                      {bestTimeEval.status === 'weekend_closed'
+                        ? 'Forex market is closed for the weekend. Are you sure?'
+                        : 'This is not a prime time for this pair. Are you sure?'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAcknowledgedWarning(true)}
+                    className="self-end sm:self-auto px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-semibold cursor-pointer shadow-xs transition-colors shrink-0"
+                  >
+                    Continue with trade
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Instrument & Direction */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
+            {/* Searchable & Grouped Instrument Selector */}
+            <div className="relative" ref={dropdownRef}>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Instrument / Pair</label>
+                <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                  Instrument / Pair *
+                </label>
                 {onAddInstrumentShortcut && (
                   <button
                     type="button"
-                    onClick={onAddInstrumentShortcut}
+                    onClick={() => {
+                      setIsInstrumentDropdownOpen(false);
+                      onAddInstrumentShortcut();
+                    }}
                     className="text-[11px] text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
                   >
                     <Plus className="w-3 h-3" />
@@ -607,23 +804,106 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({
                   </button>
                 )}
               </div>
-              <select
-                value={instrumentId}
-                onChange={(e) => setInstrumentId(e.target.value)}
-                required
-                className="w-full bg-zinc-50 dark:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 focus:border-emerald-500 text-zinc-900 dark:text-white px-3 py-2.5 rounded-xl text-sm font-mono outline-none cursor-pointer"
+
+              {/* Dropdown trigger button */}
+              <button
+                type="button"
+                onClick={() => setIsInstrumentDropdownOpen((prev) => !prev)}
+                className="w-full flex items-center justify-between bg-zinc-50 dark:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 focus:border-emerald-500 text-zinc-900 dark:text-white px-3.5 py-2.5 rounded-xl text-sm font-mono outline-none cursor-pointer text-left transition-colors"
               >
-                {instruments.map((inst) => (
-                  <option key={inst.id} value={inst.id} className="bg-white dark:bg-[#121215] text-zinc-900 dark:text-white">
-                    {inst.symbol} — {inst.name} ({inst.market_type})
-                  </option>
-                ))}
-              </select>
+                {selectedInstrument ? (
+                  <div className="flex items-center gap-2 truncate">
+                    <span className="font-bold text-zinc-900 dark:text-white">{selectedInstrument.symbol}</span>
+                    <span className="text-xs text-zinc-400 truncate">({selectedInstrument.name})</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-sans">
+                      {selectedInstrument.market_type}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-zinc-400">Select an instrument...</span>
+                )}
+                <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform ${isInstrumentDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Searchable Dropdown Popup */}
+              {isInstrumentDropdownOpen && (
+                <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 max-h-72 flex flex-col">
+                  {/* Search input */}
+                  <div className="p-2 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-[#0E0E11] flex items-center gap-2">
+                    <Search className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                    <input
+                      type="text"
+                      autoFocus
+                      value={instrumentSearch}
+                      onChange={(e) => setInstrumentSearch(e.target.value)}
+                      placeholder="Search pairs (e.g. BTC, XAU, EURUSD, NAS100)..."
+                      className="w-full bg-transparent text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 outline-none"
+                    />
+                    {instrumentSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setInstrumentSearch('')}
+                        className="text-zinc-400 hover:text-zinc-600 text-xs"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Grouped Items List */}
+                  <div className="overflow-y-auto p-1.5 space-y-2 flex-1">
+                    {(['Forex', 'Commodity/Indices', 'Crypto', 'Other'] as const).map((groupName) => {
+                      const list = groupedInstruments[groupName];
+                      if (!list || list.length === 0) return null;
+                      return (
+                        <div key={groupName} className="space-y-0.5">
+                          <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400 font-mono">
+                            {groupName === 'Commodity/Indices' ? 'Commodities & Indices' : groupName} ({list.length})
+                          </div>
+                          {list.map((inst) => {
+                            const isSelected = inst.id === instrumentId;
+                            return (
+                              <button
+                                key={inst.id}
+                                type="button"
+                                onClick={() => {
+                                  setInstrumentId(inst.id);
+                                  setIsInstrumentDropdownOpen(false);
+                                  setInstrumentSearch('');
+                                }}
+                                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-left transition-colors cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-semibold'
+                                    : 'text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono font-bold">{inst.symbol}</span>
+                                  <span className="text-[11px] text-zinc-400">{inst.name}</span>
+                                </div>
+                                {isSelected && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+
+                    {filteredInstruments.length === 0 && (
+                      <div className="p-4 text-center text-xs text-zinc-400">
+                        No pairs found matching &quot;{instrumentSearch}&quot;.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Direction Segmented Control */}
             <div>
-              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Order Direction</label>
+              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
+                Order Direction
+              </label>
               <div className="grid grid-cols-2 gap-1.5 p-1 bg-zinc-100 dark:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 rounded-xl">
                 <button
                   type="button"
@@ -866,6 +1146,77 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({
             </div>
           </div>
 
+          {/* Section: 10 Trading Rules Checklist */}
+          <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-zinc-200/80 dark:border-zinc-800">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 stroke-[2.5]" />
+                <span className="text-xs font-bold text-zinc-900 dark:text-white">
+                  My 10 Trading Rules Checklist
+                </span>
+                <span
+                  className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-semibold ${
+                    rulesFollowed.length === 10
+                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-400'
+                      : rulesFollowed.length >= 8
+                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-400'
+                      : 'bg-rose-100 text-rose-800 dark:bg-rose-950/70 dark:text-rose-400'
+                  }`}
+                >
+                  {rulesFollowed.length}/10 Followed
+                  {rulesFollowed.length === 10 ? ' (100% Disciplined)' : ` (${10 - rulesFollowed.length} Broken)`}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleSelectAllRules}
+                  className="text-[10px] text-emerald-600 dark:text-emerald-400 hover:underline font-semibold cursor-pointer"
+                >
+                  Check All
+                </button>
+                <span className="text-zinc-300 dark:text-zinc-700">|</span>
+                <button
+                  type="button"
+                  onClick={handleClearAllRules}
+                  className="text-[10px] text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+              {tradingRules.map((rule) => {
+                const isChecked = rulesFollowed.includes(rule.rule_number);
+                return (
+                  <label
+                    key={rule.rule_number}
+                    className={`flex items-start gap-2.5 p-2 rounded-xl border text-xs cursor-pointer transition-all select-none ${
+                      isChecked
+                        ? 'bg-white dark:bg-[#121215] border-emerald-500/70 text-zinc-900 dark:text-white shadow-xs'
+                        : 'bg-transparent border-zinc-200/60 dark:border-zinc-800/60 text-zinc-500 dark:text-zinc-400 opacity-70 hover:opacity-100'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => toggleRuleFollowed(rule.rule_number)}
+                      className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500 border-zinc-300 dark:border-zinc-700 cursor-pointer"
+                    />
+                    <div className="flex-1 leading-snug">
+                      <span className="font-mono font-bold mr-1 text-[11px] text-emerald-600 dark:text-emerald-400">
+                        #{rule.rule_number}
+                      </span>
+                      <span className="text-[11px]">{rule.rule_text}</span>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Trade Notes */}
           <div>
             <label className="block text-[11px] font-medium text-zinc-500 dark:text-zinc-400 mb-1">
@@ -887,7 +1238,7 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({
                 Chart Screenshots
               </label>
               <span className="text-[10px] text-zinc-400 font-mono">
-                Uploads immediately to 'trade-screenshots'
+                Uploads immediately to &apos;trade-screenshots&apos;
               </span>
             </div>
 

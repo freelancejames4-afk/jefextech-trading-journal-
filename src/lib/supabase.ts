@@ -84,7 +84,6 @@ export async function uploadTradeScreenshot(file: File, userId: string): Promise
   const client = getSupabaseClient();
 
   if (!isSupabaseConfigured()) {
-    // If not connected to real backend, generate a base64 data URL
     return fileToDataUrl(file);
   }
 
@@ -100,11 +99,10 @@ export async function uploadTradeScreenshot(file: File, userId: string): Promise
       });
 
     if (uploadError) {
-      console.warn('Supabase storage upload returned error (falling back to local preview):', uploadError.message);
+      console.warn('Supabase trade-screenshots upload warning:', uploadError.message);
       return await fileToDataUrl(file);
     }
 
-    // Get public URL
     const { data: publicData } = client.storage
       .from('trade-screenshots')
       .getPublicUrl(fileName);
@@ -120,6 +118,50 @@ export async function uploadTradeScreenshot(file: File, userId: string): Promise
 }
 
 /**
+ * Uploads a user profile avatar image to Supabase Storage bucket 'avatars'.
+ */
+export async function uploadAvatarImage(file: File, userId: string): Promise<string> {
+  const client = getSupabaseClient();
+
+  if (file.size > 3 * 1024 * 1024) {
+    throw new Error('Image size exceeds 3MB limit. Please select a smaller image.');
+  }
+
+  if (!isSupabaseConfigured()) {
+    return fileToDataUrl(file);
+  }
+
+  const fileExt = file.name.split('.').pop() || 'png';
+  const fileName = `${userId}/avatar_${Date.now()}.${fileExt}`;
+
+  try {
+    const { error: uploadError } = await client.storage
+      .from('avatars')
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.warn('Supabase avatars upload warning (falling back to data URL):', uploadError.message);
+      return await fileToDataUrl(file);
+    }
+
+    const { data: publicData } = client.storage
+      .from('avatars')
+      .getPublicUrl(fileName);
+
+    if (publicData?.publicUrl) {
+      return publicData.publicUrl;
+    }
+    return await fileToDataUrl(file);
+  } catch (err) {
+    console.warn('Avatar upload exception:', err);
+    return await fileToDataUrl(file);
+  }
+}
+
+/**
  * Helper to convert File to base64 Data URL with automatic image resizing if large
  */
 export function fileToDataUrl(file: File): Promise<string> {
@@ -127,17 +169,15 @@ export function fileToDataUrl(file: File): Promise<string> {
     const reader = new FileReader();
     reader.onload = (e) => {
       const result = e.target?.result as string;
-      // If image is under 500KB, return as-is
       if (file.size < 500 * 1024) {
         resolve(result);
         return;
       }
 
-      // If larger, compress lightly via canvas
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 1400;
+        const MAX_WIDTH = 1000;
         const scale = Math.min(1, MAX_WIDTH / img.width);
         canvas.width = img.width * scale;
         canvas.height = img.height * scale;

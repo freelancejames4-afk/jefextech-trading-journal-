@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useJournal } from '../../contexts/JournalContext';
 import { Instrument, MarketType } from '../../types';
 import { MARKET_TYPES } from '../../lib/constants';
@@ -11,6 +11,11 @@ import {
   X,
   AlertTriangle,
   RotateCcw,
+  Search,
+  Layers,
+  Globe2,
+  Gem,
+  CircleDollarSign,
 } from 'lucide-react';
 
 interface InstrumentsViewProps {
@@ -28,18 +33,21 @@ export const InstrumentsView: React.FC<InstrumentsViewProps> = () => {
   } = useJournal();
   const { showToast } = useToast();
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedFilter, setSelectedFilter] = useState<'All' | 'Forex' | 'Commodity/Indices' | 'Crypto'>('All');
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingInstrument, setEditingInstrument] = useState<Instrument | null>(null);
   const [symbol, setSymbol] = useState('');
   const [name, setName] = useState('');
-  const [marketType, setMarketType] = useState<MarketType>('Crypto');
+  const [marketType, setMarketType] = useState<MarketType>('Forex');
   const [deleteTarget, setDeleteTarget] = useState<Instrument | null>(null);
 
   const openAddModal = () => {
     setEditingInstrument(null);
     setSymbol('');
     setName('');
-    setMarketType('Crypto');
+    setMarketType('Forex');
     setIsModalOpen(true);
   };
 
@@ -86,9 +94,9 @@ export const InstrumentsView: React.FC<InstrumentsViewProps> = () => {
   const handleRestoreStarter = async () => {
     try {
       await resetStarterInstruments();
-      showToast('Default starter instruments restored!', 'success');
+      showToast('All 22 currency pairs, commodities & crypto instruments loaded!', 'success');
     } catch (err: any) {
-      showToast(err.message || 'Failed to restore default instruments', 'error');
+      showToast(err.message || 'Failed to restore instruments', 'error');
     }
   };
 
@@ -112,16 +120,82 @@ export const InstrumentsView: React.FC<InstrumentsViewProps> = () => {
     };
   };
 
+  // Filtered instruments
+  const filteredInstruments = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return instruments.filter((inst) => {
+      const matchesSearch =
+        inst.symbol.toLowerCase().includes(q) ||
+        inst.name.toLowerCase().includes(q) ||
+        inst.market_type.toLowerCase().includes(q);
+
+      if (!matchesSearch) return false;
+      if (selectedFilter === 'All') return true;
+      if (selectedFilter === 'Commodity/Indices') {
+        return (
+          inst.market_type === 'Commodity/Indices' ||
+          inst.market_type === 'Commodity' ||
+          inst.market_type === 'Indices'
+        );
+      }
+      return inst.market_type === selectedFilter;
+    });
+  }, [instruments, searchQuery, selectedFilter]);
+
+  // Group by category for structured layout
+  const groupedSections = useMemo(() => {
+    const groups: { [key: string]: { label: string; icon: React.ReactNode; items: Instrument[] } } = {
+      Forex: {
+        label: 'Forex Pairs',
+        icon: <Globe2 className="w-4 h-4 text-blue-500" />,
+        items: [],
+      },
+      'Commodity/Indices': {
+        label: 'Commodities & Indices',
+        icon: <Gem className="w-4 h-4 text-amber-500" />,
+        items: [],
+      },
+      Crypto: {
+        label: 'Cryptocurrency',
+        icon: <Coins className="w-4 h-4 text-emerald-500" />,
+        items: [],
+      },
+      Other: {
+        label: 'Other Markets',
+        icon: <CircleDollarSign className="w-4 h-4 text-zinc-400" />,
+        items: [],
+      },
+    };
+
+    filteredInstruments.forEach((inst) => {
+      if (inst.market_type === 'Forex') {
+        groups.Forex.items.push(inst);
+      } else if (
+        inst.market_type === 'Commodity/Indices' ||
+        inst.market_type === 'Commodity' ||
+        inst.market_type === 'Indices'
+      ) {
+        groups['Commodity/Indices'].items.push(inst);
+      } else if (inst.market_type === 'Crypto') {
+        groups.Crypto.items.push(inst);
+      } else {
+        groups.Other.items.push(inst);
+      }
+    });
+
+    return groups;
+  }, [filteredInstruments]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-zinc-900 dark:text-white tracking-tight">
-            Trading Instruments
+            Trading Instruments & Pairs
           </h2>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-            Manage your watched currency pairs, cryptos, and commodities
+            Watched currency pairs, commodities, and crypto assets ({instruments.length} total)
           </p>
         </div>
 
@@ -129,10 +203,11 @@ export const InstrumentsView: React.FC<InstrumentsViewProps> = () => {
           <button
             onClick={handleRestoreStarter}
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white bg-white dark:bg-[#121215] hover:bg-zinc-100 dark:hover:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors cursor-pointer"
-            title="Restore Starter List (BTC, ETH, SOL, HYPE, XAUUSD, EURUSD)"
+            title="Load all 22 Forex, Commodity, and Crypto pairs"
           >
             <RotateCcw className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span className="hidden sm:inline">Add Defaults</span>
+            <span className="hidden sm:inline">Load All 22 Pairs</span>
+            <span className="sm:hidden">Reset</span>
           </button>
 
           <button
@@ -145,106 +220,183 @@ export const InstrumentsView: React.FC<InstrumentsViewProps> = () => {
         </div>
       </div>
 
-      {/* Instruments Grid */}
-      {instruments.length === 0 ? (
+      {/* Search & Filter Toolbar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 p-2.5 rounded-2xl shadow-xs">
+        {/* Search Box */}
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by symbol, pair name, or market type (e.g. BTC, XAUUSD, EURUSD)..."
+            className="w-full bg-zinc-50 dark:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white pl-9 pr-8 py-2 rounded-xl outline-none focus:border-emerald-500 transition-colors"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Category Pills */}
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
+          {(
+            [
+              { id: 'All', label: 'All Pairs' },
+              { id: 'Forex', label: 'Forex' },
+              { id: 'Commodity/Indices', label: 'Commodities & Indices' },
+              { id: 'Crypto', label: 'Crypto' },
+            ] as const
+          ).map((filter) => {
+            const isActive = selectedFilter === filter.id;
+            return (
+              <button
+                key={filter.id}
+                onClick={() => setSelectedFilter(filter.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
+                  isActive
+                    ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 font-semibold shadow-xs'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
+                }`}
+              >
+                {filter.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Instruments Grouped Sections */}
+      {filteredInstruments.length === 0 ? (
         <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-10 text-center transition-colors">
           <div className="w-12 h-12 rounded-xl bg-zinc-100 dark:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 flex items-center justify-center mx-auto mb-3 text-zinc-400">
             <Coins className="w-6 h-6" />
           </div>
           <h3 className="text-sm font-semibold text-zinc-900 dark:text-white mb-1">
-            No Instruments Configured
+            No Instruments Found
           </h3>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto mb-4">
-            Add your favorite crypto pairs, forex pairs, or commodities to start logging trades.
+            {searchQuery
+              ? `No pairs matched "${searchQuery}". Try a different search query.`
+              : 'Add your favorite pairs or click below to restore all 22 starter pairs.'}
           </p>
           <button
             onClick={handleRestoreStarter}
             className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-sm transition-all cursor-pointer"
           >
             <RotateCcw className="w-4 h-4 stroke-[2.5]" />
-            <span>Load Starter Instruments</span>
+            <span>Load All 22 Pairs</span>
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {instruments.map((inst) => {
-            const stats = getInstrumentStats(inst.id);
-            const isProfit = stats.netPnl > 0;
-            const isLoss = stats.netPnl < 0;
+        <div className="space-y-8">
+          {(['Forex', 'Commodity/Indices', 'Crypto', 'Other'] as const).map((groupKey) => {
+            const section = groupedSections[groupKey];
+            if (!section || section.items.length === 0) return null;
 
             return (
-              <div
-                key={inst.id}
-                className="group relative bg-white dark:bg-[#121215] hover:bg-zinc-50/70 dark:hover:bg-[#16161A] border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 rounded-2xl p-5 transition-all shadow-sm flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg font-bold font-mono text-zinc-900 dark:text-white tracking-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                          {inst.symbol}
-                        </span>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-zinc-100 dark:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400">
-                          {inst.market_type}
-                        </span>
-                      </div>
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                        {inst.name}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => openEditModal(inst)}
-                        className="p-1.5 text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
-                        title="Edit instrument"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setDeleteTarget(inst)}
-                        className="p-1.5 text-zinc-400 hover:text-red-600 dark:hover:text-rose-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors cursor-pointer"
-                        title="Delete instrument"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Instrument Stats */}
-                  <div className="grid grid-cols-3 gap-2 py-3 px-3 bg-zinc-50 dark:bg-[#18181B] rounded-xl border border-zinc-200 dark:border-zinc-800 mt-3 text-xs font-mono">
-                    <div>
-                      <span className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase block">Trades</span>
-                      <span className="text-zinc-900 dark:text-white font-medium tabular-nums">
-                        {stats.tradesCount}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase block">Win %</span>
-                      <span className="text-emerald-600 dark:text-emerald-400 font-medium tabular-nums">
-                        {stats.tradesCount > 0 ? `${stats.winRate.toFixed(0)}%` : '—'}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase block">Net P&L</span>
-                      <span
-                        className={`font-bold tabular-nums ${
-                          isProfit
-                            ? 'text-emerald-600 dark:text-emerald-400'
-                            : isLoss
-                            ? 'text-red-600 dark:text-red-400'
-                            : 'text-zinc-400'
-                        }`}
-                      >
-                        {stats.netPnl > 0 ? '+' : ''}${stats.netPnl.toFixed(0)}
-                      </span>
-                    </div>
+              <div key={groupKey} className="space-y-3">
+                {/* Section Header */}
+                <div className="flex items-center justify-between px-1">
+                  <div className="flex items-center gap-2">
+                    {section.icon}
+                    <h3 className="text-sm font-bold text-zinc-900 dark:text-white">
+                      {section.label}
+                    </h3>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 text-zinc-500 font-semibold">
+                      {section.items.length}
+                    </span>
                   </div>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-zinc-200/60 dark:border-zinc-800/60 flex items-center justify-between text-[11px] text-zinc-400">
-                  <span>Available in Add Trade</span>
-                  <span className="font-mono text-emerald-600 dark:text-emerald-400 font-medium">Active</span>
+                {/* Cards Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                  {section.items.map((inst) => {
+                    const stats = getInstrumentStats(inst.id);
+                    const isProfit = stats.netPnl > 0;
+                    const isLoss = stats.netPnl < 0;
+
+                    return (
+                      <div
+                        key={inst.id}
+                        className="group relative bg-white dark:bg-[#121215] hover:bg-zinc-50/70 dark:hover:bg-[#16161A] border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 rounded-2xl p-4.5 transition-all shadow-xs flex flex-col justify-between"
+                      >
+                        <div>
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-base font-bold font-mono text-zinc-900 dark:text-white tracking-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                                  {inst.symbol}
+                                </span>
+                                <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-zinc-100 dark:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400">
+                                  {inst.market_type}
+                                </span>
+                              </div>
+                              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                                {inst.name}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={() => openEditModal(inst)}
+                                className="p-1.5 text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
+                                title="Edit instrument"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => setDeleteTarget(inst)}
+                                className="p-1.5 text-zinc-400 hover:text-red-600 dark:hover:text-rose-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors cursor-pointer"
+                                title="Delete instrument"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Instrument Stats */}
+                          <div className="grid grid-cols-3 gap-2 py-2.5 px-3 bg-zinc-50 dark:bg-[#18181B] rounded-xl border border-zinc-200 dark:border-zinc-800 mt-3 text-xs font-mono">
+                            <div>
+                              <span className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase block">Trades</span>
+                              <span className="text-zinc-900 dark:text-white font-medium tabular-nums">
+                                {stats.tradesCount}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase block">Win %</span>
+                              <span className="text-emerald-600 dark:text-emerald-400 font-medium tabular-nums">
+                                {stats.tradesCount > 0 ? `${stats.winRate.toFixed(0)}%` : '—'}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase block">Net P&L</span>
+                              <span
+                                className={`font-bold tabular-nums ${
+                                  isProfit
+                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                    : isLoss
+                                    ? 'text-red-600 dark:text-red-400'
+                                    : 'text-zinc-400'
+                                }`}
+                              >
+                                {stats.netPnl > 0 ? '+' : ''}${stats.netPnl.toFixed(0)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-3.5 pt-2.5 border-t border-zinc-200/60 dark:border-zinc-800/60 flex items-center justify-between text-[11px] text-zinc-400">
+                          <span>Available in Add Trade</span>
+                          <span className="font-mono text-emerald-600 dark:text-emerald-400 font-medium">Ready</span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -271,13 +423,13 @@ export const InstrumentsView: React.FC<InstrumentsViewProps> = () => {
             <form onSubmit={handleSave} className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
-                  Ticker / Symbol (e.g. BTC, XAUUSD, EURUSD)
+                  Ticker / Symbol (e.g. BTC, XAUUSD, NAS100, EURUSD)
                 </label>
                 <input
                   type="text"
                   value={symbol}
                   onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-                  placeholder="BTC"
+                  placeholder="EURUSD"
                   required
                   className="w-full bg-zinc-50 dark:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 focus:border-emerald-500 text-zinc-900 dark:text-white px-3 py-2 rounded-xl text-sm font-mono uppercase outline-none"
                 />
@@ -291,7 +443,7 @@ export const InstrumentsView: React.FC<InstrumentsViewProps> = () => {
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Bitcoin / US Dollar"
+                  placeholder="Euro / US Dollar"
                   required
                   className="w-full bg-zinc-50 dark:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 focus:border-emerald-500 text-zinc-900 dark:text-white px-3 py-2 rounded-xl text-sm outline-none"
                 />

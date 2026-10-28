@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastProvider } from './components/common/Toast';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -10,8 +10,12 @@ import { DailyJournalView } from './components/journal/DailyJournalView';
 import { TradesListView } from './components/trades/TradesListView';
 import { AnalyticsView } from './components/analytics/AnalyticsView';
 import { InstrumentsView } from './components/instruments/InstrumentsView';
+import { SettingsView } from './components/settings/SettingsView';
+import { BestTimesView } from './components/besttimes/BestTimesView';
 import { AddTradeModal } from './components/trades/AddTradeModal';
 import { TradeDetailModal } from './components/trades/TradeDetailModal';
+import { TradingRulesModal } from './components/rules/TradingRulesModal';
+import { ProfileUploadModal } from './components/profile/ProfileUploadModal';
 import { ConfigModal } from './components/common/ConfigModal';
 import { Trade } from './types';
 import { AlertCircle, TrendingUp } from 'lucide-react';
@@ -23,8 +27,22 @@ const MainApp: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<string>('journal');
   const [isAddTradeOpen, setIsAddTradeOpen] = useState(false);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
+  const [isRulesGatingTrade, setIsRulesGatingTrade] = useState(false);
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const [tradeToEdit, setTradeToEdit] = useState<Trade | null>(null);
+
+  // Show "My 10 Trading Rules" popup on app open once per user session
+  useEffect(() => {
+    if (!user) return;
+    const hasSeenRulesSession = sessionStorage.getItem(`jefex_rules_seen_${user.id}`);
+    if (!hasSeenRulesSession) {
+      setIsRulesModalOpen(true);
+      setIsRulesGatingTrade(false);
+      sessionStorage.setItem(`jefex_rules_seen_${user.id}`, 'true');
+    }
+  }, [user]);
 
   // Splash Loading Screen
   if (authLoading) {
@@ -48,6 +66,20 @@ const MainApp: React.FC = () => {
     return <AuthScreen />;
   }
 
+  // Every time "+ New Trade" is clicked, show rules affirmation popup first
+  const handleInitiateNewTrade = () => {
+    setTradeToEdit(null);
+    setIsRulesGatingTrade(true);
+    setIsRulesModalOpen(true);
+  };
+
+  const handleRulesAffirmed = () => {
+    if (isRulesGatingTrade) {
+      setIsRulesGatingTrade(false);
+      setIsAddTradeOpen(true);
+    }
+  };
+
   const handleOpenEditTrade = (trade: Trade) => {
     setSelectedTrade(null);
     setTradeToEdit(trade);
@@ -65,11 +97,12 @@ const MainApp: React.FC = () => {
       <Navbar
         currentTab={currentTab}
         onTabChange={(tab) => setCurrentTab(tab)}
-        onOpenAddTrade={() => {
-          setTradeToEdit(null);
-          setIsAddTradeOpen(true);
+        onOpenAddTrade={handleInitiateNewTrade}
+        onOpenRules={() => {
+          setIsRulesGatingTrade(false);
+          setIsRulesModalOpen(true);
         }}
-        onOpenConfig={() => setIsConfigOpen(true)}
+        onOpenProfileModal={() => setIsProfileModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -79,14 +112,14 @@ const MainApp: React.FC = () => {
             <div className="flex items-center gap-2.5">
               <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
               <span>
-                Supabase sync notice: {journalError}. If you haven't run the SQL schema yet, open settings to copy it.
+                Supabase sync notice: {journalError}. If you haven&apos;t run the SQL schema yet, open settings to copy it.
               </span>
             </div>
             <button
-              onClick={() => setIsConfigOpen(true)}
+              onClick={() => setCurrentTab('settings')}
               className="px-3 py-1 bg-white dark:bg-[#121215] hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-amber-300 dark:border-amber-700 rounded-lg text-xs text-zinc-900 dark:text-white shrink-0 font-medium cursor-pointer"
             >
-              View SQL Schema
+              Open Settings
             </button>
           </div>
         )}
@@ -95,31 +128,38 @@ const MainApp: React.FC = () => {
         {currentTab === 'journal' && (
           <DailyJournalView
             onOpenTradeDetail={(trade) => setSelectedTrade(trade)}
-            onOpenAddTrade={() => {
-              setTradeToEdit(null);
-              setIsAddTradeOpen(true);
-            }}
+            onOpenAddTrade={handleInitiateNewTrade}
           />
         )}
 
         {currentTab === 'trades' && (
           <TradesListView
             onOpenTradeDetail={(trade) => setSelectedTrade(trade)}
-            onOpenAddTrade={() => {
-              setTradeToEdit(null);
-              setIsAddTradeOpen(true);
-            }}
+            onOpenAddTrade={handleInitiateNewTrade}
           />
         )}
 
         {currentTab === 'analytics' && (
           <AnalyticsView
             onSelectJournalDay={handleSelectJournalDayFromAnalytics}
+            onOpenRulesModal={() => {
+              setIsRulesGatingTrade(false);
+              setIsRulesModalOpen(true);
+            }}
+            onNavigateToBestTimes={() => setCurrentTab('best-times')}
           />
+        )}
+
+        {currentTab === 'best-times' && (
+          <BestTimesView />
         )}
 
         {currentTab === 'instruments' && (
           <InstrumentsView />
+        )}
+
+        {currentTab === 'settings' && (
+          <SettingsView />
         )}
       </main>
 
@@ -127,13 +167,25 @@ const MainApp: React.FC = () => {
       <MobileNav
         currentTab={currentTab}
         onTabChange={(tab) => setCurrentTab(tab)}
-        onOpenAddTrade={() => {
-          setTradeToEdit(null);
-          setIsAddTradeOpen(true);
-        }}
+        onOpenAddTrade={handleInitiateNewTrade}
       />
 
       {/* Modals */}
+      <TradingRulesModal
+        isOpen={isRulesModalOpen}
+        onClose={() => {
+          setIsRulesModalOpen(false);
+          setIsRulesGatingTrade(false);
+        }}
+        onConfirmAndProceed={handleRulesAffirmed}
+        onOpenSettings={() => setCurrentTab('settings')}
+      />
+
+      <ProfileUploadModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+      />
+
       <AddTradeModal
         isOpen={isAddTradeOpen}
         onClose={() => {

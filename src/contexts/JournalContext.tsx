@@ -1,30 +1,41 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
-import { Instrument, JournalDay, Trade, AnalyticsStats, TradeFilters, MarketType } from '../types';
-import { useAuth } from './AuthContext';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { Instrument, Trade, JournalDay, MarketType, TradingRule, AnalyticsStats } from '../types';
+import { STARTER_INSTRUMENTS, DEFAULT_TRADING_RULES } from '../lib/constants';
 import { getSupabaseClient, isSupabaseConfigured } from '../lib/supabase';
-import { STARTER_INSTRUMENTS } from '../lib/constants';
+import { useAuth } from './AuthContext';
 
 interface JournalContextType {
   instruments: Instrument[];
   trades: Trade[];
   journalDays: JournalDay[];
-  currentDate: string; // YYYY-MM-DD
+  currentDate: string;
   currentJournalDay: JournalDay | null;
   loading: boolean;
   error: string | null;
-  setCurrentDate: (date: string) => void;
   // Day actions
+  setCurrentDate: (date: string) => void;
   saveDayNotes: (date: string, notes: string) => Promise<void>;
   toggleDayCompleted: (date: string, completed: boolean) => Promise<void>;
   // Trade actions
-  addTrade: (tradeData: Omit<Trade, 'id' | 'user_id' | 'created_at'>) => Promise<Trade>;
-  updateTrade: (id: string, tradeData: Partial<Trade>) => Promise<Trade>;
+  addTrade: (trade: Omit<Trade, 'id' | 'user_id' | 'created_at'>) => Promise<Trade>;
+  updateTrade: (id: string, trade: Partial<Trade>) => Promise<Trade>;
   deleteTrade: (id: string) => Promise<void>;
   // Instrument actions
   addInstrument: (symbol: string, name: string, market_type: MarketType) => Promise<Instrument>;
   updateInstrument: (id: string, symbol: string, name: string, market_type: MarketType) => Promise<Instrument>;
   deleteInstrument: (id: string) => Promise<void>;
   resetStarterInstruments: () => Promise<void>;
+  // Profile avatar actions
+  avatarUrl: string | null;
+  updateAvatarUrl: (url: string | null) => Promise<void>;
+  // Trading rules actions
+  tradingRules: TradingRule[];
+  updateTradingRule: (ruleNumber: number, ruleText: string) => Promise<void>;
+  resetTradingRules: () => Promise<void>;
+  // Best trading times overrides
+  bestTimesOverrides: Record<string, string>;
+  updateBestTimeOverride: (symbol: string, windowDescription: string) => Promise<void>;
+  resetBestTimeOverrides: () => Promise<void>;
   // Navigation & Refresh
   refreshData: () => Promise<void>;
   analyticsStats: AnalyticsStats;
@@ -33,7 +44,6 @@ interface JournalContextType {
 
 const JournalContext = createContext<JournalContextType | undefined>(undefined);
 
-// Helper for formatted local date 'YYYY-MM-DD'
 export const getTodayDateString = (): string => {
   const d = new Date();
   const year = d.getFullYear();
@@ -51,49 +61,97 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Local storage mock store keys (for demo or backup)
-  const getStorageKey = (key: string) => `jefex_${user?.id || 'guest'}_${key}`;
+  // Profile avatar logo
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  // Trading rules
+  const [tradingRules, setTradingRules] = useState<TradingRule[]>(DEFAULT_TRADING_RULES);
+
+  // Best times user custom overrides (symbol -> window description)
+  const [bestTimesOverrides, setBestTimesOverrides] = useState<Record<string, string>>({});
+
+  const getStorageKey = useCallback((key: string) => `jefex_${user?.id || 'guest'}_${key}`, [user?.id]);
 
   const loadFromLocalStorage = useCallback(() => {
     if (!user) return;
     try {
       const storedInst = localStorage.getItem(getStorageKey('instruments'));
       let instList: Instrument[] = storedInst ? JSON.parse(storedInst) : [];
-      if (instList.length === 0) {
-        instList = STARTER_INSTRUMENTS.map((item, idx) => ({
-          id: `inst-starter-${idx}`,
+
+      // Check for missing starter instruments and append them
+      const existingSymbols = new Set(instList.map((i) => i.symbol.toUpperCase().trim()));
+      const missingStarters = STARTER_INSTRUMENTS.filter(
+        (starter) => !existingSymbols.has(starter.symbol.toUpperCase().trim())
+      );
+
+      if (missingStarters.length > 0) {
+        const newlyAdded = missingStarters.map((item, idx) => ({
+          id: `inst-starter-${Date.now()}-${idx}`,
           user_id: user.id,
           symbol: item.symbol,
           name: item.name,
           market_type: item.market_type,
           created_at: new Date().toISOString(),
         }));
+        instList = [...instList, ...newlyAdded];
         localStorage.setItem(getStorageKey('instruments'), JSON.stringify(instList));
       }
+
       setInstruments(instList);
 
       const storedTrades = localStorage.getItem(getStorageKey('trades'));
-      const tradesList: Trade[] = storedTrades ? JSON.parse(storedTrades) : [];
-      setTrades(tradesList);
+      if (storedTrades) {
+        setTrades(JSON.parse(storedTrades));
+      } else {
+        setTrades([]);
+      }
 
       const storedDays = localStorage.getItem(getStorageKey('journal_days'));
-      const daysList: JournalDay[] = storedDays ? JSON.parse(storedDays) : [];
-      setJournalDays(daysList);
+      if (storedDays) {
+        setJournalDays(JSON.parse(storedDays));
+      } else {
+        setJournalDays([]);
+      }
+
+      const storedAvatar = localStorage.getItem(getStorageKey('avatar'));
+      if (storedAvatar) {
+        setAvatarUrl(storedAvatar);
+      }
+
+      const storedRules = localStorage.getItem(getStorageKey('rules'));
+      if (storedRules) {
+        try {
+          setTradingRules(JSON.parse(storedRules));
+        } catch {
+          setTradingRules(DEFAULT_TRADING_RULES);
+        }
+      }
+
+      const storedBt = localStorage.getItem(getStorageKey('best_times'));
+      if (storedBt) {
+        try {
+          setBestTimesOverrides(JSON.parse(storedBt));
+        } catch {
+          setBestTimesOverrides({});
+        }
+      }
     } catch (e) {
       console.warn('Error reading from localStorage store:', e);
     }
-  }, [user]);
+  }, [user, getStorageKey]);
 
   const refreshData = useCallback(async () => {
     if (!user) {
       setInstruments([]);
       setTrades([]);
       setJournalDays([]);
+      setAvatarUrl(null);
+      setTradingRules(DEFAULT_TRADING_RULES);
+      setBestTimesOverrides({});
       setLoading(false);
       return;
     }
 
-    // Only set loading to true on initial load if we don't have instruments yet
     setInstruments((prev) => {
       if (prev.length === 0) setLoading(true);
       return prev;
@@ -118,7 +176,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         .order('symbol', { ascending: true });
 
       if (instError) {
-        console.warn('Supabase instruments fetch error (falling back to local):', instError.message);
+        console.warn('Supabase instruments fetch notice:', instError.message);
         loadFromLocalStorage();
         setError(instError.message);
         setLoading(false);
@@ -126,32 +184,49 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
 
       let activeInstruments: Instrument[] = instData || [];
-      // Auto-add starter instruments if empty
-      if (activeInstruments.length === 0) {
-        const rows = STARTER_INSTRUMENTS.map((item) => ({
+
+      // Check for missing starter instruments and auto-insert them without duplicates
+      const existingSymbols = new Set(activeInstruments.map((i) => i.symbol.toUpperCase().trim()));
+      const missingStarters = STARTER_INSTRUMENTS.filter(
+        (starter) => !existingSymbols.has(starter.symbol.toUpperCase().trim())
+      );
+
+      if (missingStarters.length > 0) {
+        const rows = missingStarters.map((item) => ({
           user_id: user.id,
           symbol: item.symbol,
           name: item.name,
           market_type: item.market_type,
         }));
-        const { data: seeded, error: seedErr } = await client
-          .from('instruments')
-          .insert(rows)
-          .select();
-        if (!seedErr && seeded) {
-          activeInstruments = seeded;
+        try {
+          const { data: seeded, error: seedErr } = await client
+            .from('instruments')
+            .insert(rows)
+            .select();
+
+          if (!seedErr && seeded) {
+            activeInstruments = [...activeInstruments, ...seeded];
+          }
+        } catch (e) {
+          console.warn('Starter seeding notice:', e);
         }
       }
+
       setInstruments(activeInstruments);
+      localStorage.setItem(getStorageKey('instruments'), JSON.stringify(activeInstruments));
 
       // 2. Fetch Journal Days
       const { data: daysData, error: daysError } = await client
         .from('journal_days')
         .select('*')
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .order('date', { ascending: false });
 
-      if (!daysError && daysData) {
-        setJournalDays(daysData);
+      if (daysError) {
+        console.warn('Journal days fetch notice:', daysError.message);
+      } else {
+        setJournalDays(daysData || []);
+        localStorage.setItem(getStorageKey('journal_days'), JSON.stringify(daysData || []));
       }
 
       // 3. Fetch Trades
@@ -161,34 +236,106 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (!tradesError && tradesData) {
-        // Attach instrument details to each trade
-        const instrumentMap = new Map(activeInstruments.map((i) => [i.id, i]));
-        const enrichedTrades: Trade[] = tradesData.map((t) => ({
+      if (tradesError) {
+        console.warn('Trades fetch notice:', tradesError.message);
+      } else {
+        const resolvedTrades: Trade[] = (tradesData || []).map((t) => ({
           ...t,
-          instrument: instrumentMap.get(t.instrument_id),
+          instrument: activeInstruments.find((i) => i.id === t.instrument_id),
+          rules_followed: Array.isArray(t.rules_followed) ? t.rules_followed : [],
+          traded_in_best_time: t.traded_in_best_time === true,
         }));
-        setTrades(enrichedTrades);
+        setTrades(resolvedTrades);
+        localStorage.setItem(getStorageKey('trades'), JSON.stringify(resolvedTrades));
+      }
+
+      // 4. Fetch User Profile (Avatar Logo)
+      try {
+        const { data: profileData } = await client
+          .from('profiles')
+          .select('avatar_url')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (profileData && profileData.avatar_url) {
+          setAvatarUrl(profileData.avatar_url);
+          localStorage.setItem(getStorageKey('avatar'), profileData.avatar_url);
+        } else {
+          const localAvatar = localStorage.getItem(getStorageKey('avatar'));
+          if (localAvatar) setAvatarUrl(localAvatar);
+        }
+      } catch (profileErr) {
+        console.warn('Could not fetch profiles table (fallback to local):', profileErr);
+        const localAvatar = localStorage.getItem(getStorageKey('avatar'));
+        if (localAvatar) setAvatarUrl(localAvatar);
+      }
+
+      // 5. Fetch Trading Rules
+      try {
+        const { data: rulesData } = await client
+          .from('trading_rules')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('rule_number', { ascending: true });
+
+        if (rulesData && rulesData.length > 0) {
+          setTradingRules(rulesData);
+          localStorage.setItem(getStorageKey('rules'), JSON.stringify(rulesData));
+        } else {
+          const localRules = localStorage.getItem(getStorageKey('rules'));
+          if (localRules) {
+            setTradingRules(JSON.parse(localRules));
+          } else {
+            setTradingRules(DEFAULT_TRADING_RULES);
+          }
+        }
+      } catch (rulesErr) {
+        console.warn('Could not fetch trading_rules table (fallback to defaults):', rulesErr);
+        setTradingRules(DEFAULT_TRADING_RULES);
+      }
+
+      // 6. Fetch Best Times Custom Overrides
+      try {
+        const { data: btData } = await client
+          .from('best_times')
+          .select('*')
+          .eq('user_id', user.id);
+
+        if (btData && btData.length > 0) {
+          const map: Record<string, string> = {};
+          btData.forEach((row: any) => {
+            if (row.symbol && row.session_description) {
+              map[row.symbol.toUpperCase()] = row.session_description;
+            }
+          });
+          setBestTimesOverrides(map);
+          localStorage.setItem(getStorageKey('best_times'), JSON.stringify(map));
+        } else {
+          const localBt = localStorage.getItem(getStorageKey('best_times'));
+          if (localBt) setBestTimesOverrides(JSON.parse(localBt));
+        }
+      } catch (btErr) {
+        console.warn('Could not fetch best_times table:', btErr);
+        const localBt = localStorage.getItem(getStorageKey('best_times'));
+        if (localBt) setBestTimesOverrides(JSON.parse(localBt));
       }
     } catch (err: any) {
-      console.warn('Fetch exception:', err);
+      console.warn('Sync exception:', err);
       setError(err.message || 'Failed to sync with Supabase');
       loadFromLocalStorage();
     } finally {
       setLoading(false);
     }
-  }, [user, isDemoUser, loadFromLocalStorage]);
+  }, [user, isDemoUser, loadFromLocalStorage, getStorageKey]);
 
   useEffect(() => {
     refreshData();
-  }, [user?.id, isDemoUser]);
+  }, [user?.id, isDemoUser, refreshData]);
 
-  // Current journal day object
   const currentJournalDay = useMemo(() => {
     return journalDays.find((d) => d.date === currentDate) || null;
   }, [journalDays, currentDate]);
 
-  // Ensure current day exists or getOrCreate
   const ensureJournalDay = useCallback(
     async (date: string): Promise<JournalDay> => {
       const existing = journalDays.find((d) => d.date === date);
@@ -214,7 +361,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       try {
         const client = getSupabaseClient();
-        const { data, error } = await client
+        const { data, error: insertError } = await client
           .from('journal_days')
           .insert({
             user_id: user.id,
@@ -225,23 +372,21 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
           .select()
           .single();
 
-        if (error) {
-          // If already exists or error, fallback
+        if (insertError) {
           const fallback = { ...newDay };
           setJournalDays((prev) => [...prev, fallback]);
           return fallback;
         }
         setJournalDays((prev) => [...prev, data]);
         return data;
-      } catch (err) {
+      } catch {
         setJournalDays((prev) => [...prev, newDay]);
         return newDay;
       }
     },
-    [journalDays, user, isDemoUser]
+    [journalDays, user, isDemoUser, getStorageKey]
   );
 
-  // Automatically ensure today's journal day exists when app opens
   useEffect(() => {
     if (user && !loading) {
       ensureJournalDay(currentDate);
@@ -273,7 +418,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     try {
       const client = getSupabaseClient();
-      const { data, error } = await client
+      const { data, error: upsertErr } = await client
         .from('journal_days')
         .upsert(
           {
@@ -286,7 +431,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         .select()
         .single();
 
-      if (!error && data) {
+      if (!upsertErr && data) {
         setJournalDays((prev) =>
           prev.map((d) => (d.date === date ? { ...d, notes } : d))
         );
@@ -321,7 +466,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     try {
       const client = getSupabaseClient();
-      const { data, error } = await client
+      const { data, error: upsertErr } = await client
         .from('journal_days')
         .upsert(
           {
@@ -334,7 +479,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         .select()
         .single();
 
-      if (!error && data) {
+      if (!upsertErr && data) {
         setJournalDays((prev) =>
           prev.map((d) => (d.date === date ? { ...d, completed } : d))
         );
@@ -348,9 +493,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const addTrade = async (tradeData: Omit<Trade, 'id' | 'user_id' | 'created_at'>): Promise<Trade> => {
     if (!user) throw new Error('User not logged in');
 
-    // Ensure day exists
     const day = await ensureJournalDay(currentDate);
-
     const newTradeId = `trade-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const instrument = instruments.find((i) => i.id === tradeData.instrument_id);
 
@@ -359,6 +502,8 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       id: newTradeId,
       user_id: user.id,
       journal_day_id: day.id,
+      rules_followed: tradeData.rules_followed || [],
+      traded_in_best_time: tradeData.traded_in_best_time ?? false,
       created_at: new Date().toISOString(),
       instrument,
     };
@@ -372,7 +517,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     try {
       const client = getSupabaseClient();
-      const insertPayload = {
+      const insertPayload: any = {
         user_id: user.id,
         journal_day_id: day.id,
         instrument_id: tradeData.instrument_id,
@@ -389,16 +534,38 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         emotion: tradeData.emotion || '',
         notes: tradeData.notes || '',
         screenshot_urls: tradeData.screenshot_urls || [],
+        rules_followed: tradeData.rules_followed || [],
+        traded_in_best_time: tradeData.traded_in_best_time ?? false,
       };
 
-      const { data, error } = await client
+      const { data, error: insertError } = await client
         .from('trades')
         .insert(insertPayload)
         .select()
         .single();
 
-      if (error) {
-        console.warn('Trade insert error (falling back to state):', error.message);
+      if (insertError) {
+        console.warn('Trade insert warning, attempting fallback without newly migrated columns:', insertError.message);
+        // Fallback in case rules_followed or traded_in_best_time column doesn't exist yet in Supabase
+        delete insertPayload.traded_in_best_time;
+        delete insertPayload.rules_followed;
+        const { data: retryData, error: retryErr } = await client
+          .from('trades')
+          .insert(insertPayload)
+          .select()
+          .single();
+
+        if (!retryErr && retryData) {
+          const created: Trade = {
+            ...retryData,
+            rules_followed: tradeData.rules_followed || [],
+            traded_in_best_time: tradeData.traded_in_best_time ?? false,
+            instrument,
+          };
+          setTrades((prev) => [created, ...prev]);
+          return created;
+        }
+
         const updated = [fullTrade, ...trades];
         setTrades(updated);
         localStorage.setItem(getStorageKey('trades'), JSON.stringify(updated));
@@ -407,11 +574,13 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       const created: Trade = {
         ...data,
+        rules_followed: data.rules_followed || tradeData.rules_followed || [],
+        traded_in_best_time: data.traded_in_best_time !== undefined ? data.traded_in_best_time : (tradeData.traded_in_best_time ?? false),
         instrument,
       };
       setTrades((prev) => [created, ...prev]);
       return created;
-    } catch (err: any) {
+    } catch {
       const updated = [fullTrade, ...trades];
       setTrades(updated);
       localStorage.setItem(getStorageKey('trades'), JSON.stringify(updated));
@@ -458,8 +627,10 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (tradeData.emotion !== undefined) updatePayload.emotion = tradeData.emotion;
       if (tradeData.notes !== undefined) updatePayload.notes = tradeData.notes;
       if (tradeData.screenshot_urls !== undefined) updatePayload.screenshot_urls = tradeData.screenshot_urls;
+      if (tradeData.rules_followed !== undefined) updatePayload.rules_followed = tradeData.rules_followed;
+      if (tradeData.traded_in_best_time !== undefined) updatePayload.traded_in_best_time = tradeData.traded_in_best_time;
 
-      const { data, error } = await client
+      const { data, error: updateErr } = await client
         .from('trades')
         .update(updatePayload)
         .eq('id', id)
@@ -467,9 +638,11 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         .select()
         .single();
 
-      if (!error && data) {
+      if (!updateErr && data) {
         const finalTrade = {
           ...data,
+          rules_followed: data.rules_followed || tradeData.rules_followed || existing.rules_followed || [],
+          traded_in_best_time: data.traded_in_best_time !== undefined ? data.traded_in_best_time : (tradeData.traded_in_best_time ?? existing.traded_in_best_time ?? false),
           instrument: updatedTrade.instrument,
         };
         setTrades((prev) => prev.map((t) => (t.id === id ? finalTrade : t)));
@@ -515,6 +688,12 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const cleanSymbol = symbol.trim().toUpperCase();
     const cleanName = name.trim();
 
+    // Prevent duplicate symbol
+    const existing = instruments.find((i) => i.symbol.toUpperCase() === cleanSymbol);
+    if (existing) {
+      return existing;
+    }
+
     const newInst: Instrument = {
       id: `inst-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       user_id: user.id,
@@ -533,7 +712,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     try {
       const client = getSupabaseClient();
-      const { data, error } = await client
+      const { data, error: insertError } = await client
         .from('instruments')
         .insert({
           user_id: user.id,
@@ -544,7 +723,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         .select()
         .single();
 
-      if (!error && data) {
+      if (!insertError && data) {
         setInstruments((prev) => [...prev, data]);
         return data;
       }
@@ -584,7 +763,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     try {
       const client = getSupabaseClient();
-      const { data, error } = await client
+      const { data, error: updateError } = await client
         .from('instruments')
         .update({
           symbol: cleanSymbol,
@@ -596,7 +775,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         .select()
         .single();
 
-      if (!error && data) {
+      if (!updateError && data) {
         setInstruments((prev) => prev.map((i) => (i.id === id ? data : i)));
         return data;
       }
@@ -633,8 +812,127 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const resetStarterInstruments = async () => {
     if (!user) return;
     for (const starter of STARTER_INSTRUMENTS) {
-      if (!instruments.some((i) => i.symbol === starter.symbol)) {
+      if (!instruments.some((i) => i.symbol.toUpperCase() === starter.symbol.toUpperCase())) {
         await addInstrument(starter.symbol, starter.name, starter.market_type);
+      }
+    }
+  };
+
+  // Profile avatar actions
+  const updateAvatarUrl = async (url: string | null) => {
+    setAvatarUrl(url);
+    if (!user) return;
+
+    localStorage.setItem(getStorageKey('avatar'), url || '');
+
+    if (!isDemoUser && isSupabaseConfigured()) {
+      try {
+        const client = getSupabaseClient();
+        await client.from('profiles').upsert(
+          {
+            user_id: user.id,
+            avatar_url: url,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id' }
+        );
+      } catch (err) {
+        console.warn('Update avatar error in profiles table:', err);
+      }
+    }
+  };
+
+  // Trading rules actions
+  const updateTradingRule = async (ruleNumber: number, ruleText: string) => {
+    const updated = tradingRules.map((r) =>
+      r.rule_number === ruleNumber ? { ...r, rule_text: ruleText } : r
+    );
+    setTradingRules(updated);
+
+    if (user) {
+      localStorage.setItem(getStorageKey('rules'), JSON.stringify(updated));
+
+      if (!isDemoUser && isSupabaseConfigured()) {
+        try {
+          const client = getSupabaseClient();
+          await client.from('trading_rules').upsert(
+            {
+              user_id: user.id,
+              rule_number: ruleNumber,
+              rule_text: ruleText,
+            },
+            { onConflict: 'user_id,rule_number' }
+          );
+        } catch (err) {
+          console.warn('Update trading rule in Supabase:', err);
+        }
+      }
+    }
+  };
+
+  const resetTradingRules = async () => {
+    setTradingRules(DEFAULT_TRADING_RULES);
+    if (user) {
+      localStorage.setItem(getStorageKey('rules'), JSON.stringify(DEFAULT_TRADING_RULES));
+      if (!isDemoUser && isSupabaseConfigured()) {
+        try {
+          const client = getSupabaseClient();
+          for (const rule of DEFAULT_TRADING_RULES) {
+            await client.from('trading_rules').upsert(
+              {
+                user_id: user.id,
+                rule_number: rule.rule_number,
+                rule_text: rule.rule_text,
+              },
+              { onConflict: 'user_id,rule_number' }
+            );
+          }
+        } catch (err) {
+          console.warn('Reset trading rules error:', err);
+        }
+      }
+    }
+  };
+
+  // Best trading times custom overrides actions
+  const updateBestTimeOverride = async (symbol: string, windowDescription: string) => {
+    const cleanSym = symbol.trim().toUpperCase();
+    const updated = { ...bestTimesOverrides, [cleanSym]: windowDescription };
+    setBestTimesOverrides(updated);
+
+    if (user) {
+      localStorage.setItem(getStorageKey('best_times'), JSON.stringify(updated));
+
+      if (!isDemoUser && isSupabaseConfigured()) {
+        try {
+          const client = getSupabaseClient();
+          await client.from('best_times').upsert(
+            {
+              user_id: user.id,
+              symbol: cleanSym,
+              session_description: windowDescription,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'user_id,symbol' }
+          );
+        } catch (err) {
+          console.warn('Update best time in Supabase:', err);
+        }
+      }
+    }
+  };
+
+  const resetBestTimeOverrides = async () => {
+    setBestTimesOverrides({});
+    if (user) {
+      localStorage.removeItem(getStorageKey('best_times'));
+      if (!isDemoUser && isSupabaseConfigured()) {
+        try {
+          const client = getSupabaseClient();
+          await client.from('best_times').delete().eq('user_id', user.id);
+        } catch (err) {
+          console.warn('Reset best times error in Supabase:', err);
+        }
       }
     }
   };
@@ -645,7 +943,6 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const day = journalDays.find((d) => d.date === date);
       return trades.filter((t) => {
         if (day && t.journal_day_id === day.id) return true;
-        // Fallback: check trade created_at date
         const tradeDate = t.created_at?.split('T')[0];
         return tradeDate === date;
       });
@@ -668,6 +965,14 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         avgWin: 0,
         avgLoss: 0,
         maxDrawdown: 0,
+        rulesDisciplinedTrades: 0,
+        rulesBrokenTrades: 0,
+        bestTimeTradesCount: 0,
+        bestTimeWinsCount: 0,
+        bestTimeWinRate: 0,
+        outsideBestTimeTradesCount: 0,
+        outsideBestTimeWinsCount: 0,
+        outsideBestTimeWinRate: 0,
       };
     }
 
@@ -677,6 +982,13 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     let breakevenTrades = 0;
     let grossProfit = 0;
     let grossLoss = 0;
+    let rulesDisciplinedTrades = 0;
+    let rulesBrokenTrades = 0;
+
+    let bestTimeTradesCount = 0;
+    let bestTimeWinsCount = 0;
+    let outsideBestTimeTradesCount = 0;
+    let outsideBestTimeWinsCount = 0;
 
     const instrumentPnlMap: Record<string, number> = {};
 
@@ -684,14 +996,36 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const pnl = Number(trade.pnl) || 0;
       totalPnl += pnl;
 
-      if (trade.result === 'win' || pnl > 0) {
+      const isWin = trade.result === 'win' || pnl > 0;
+      const isLoss = trade.result === 'loss' || pnl < 0;
+
+      if (isWin) {
         winningTrades++;
         grossProfit += pnl;
-      } else if (trade.result === 'loss' || pnl < 0) {
+      } else if (isLoss) {
         losingTrades++;
         grossLoss += Math.abs(pnl);
       } else {
         breakevenTrades++;
+      }
+
+      // Check rules followed
+      const rf = trade.rules_followed;
+      if (rf && Array.isArray(rf)) {
+        if (rf.length === 10) {
+          rulesDisciplinedTrades++;
+        } else if (rf.length > 0) {
+          rulesBrokenTrades++;
+        }
+      }
+
+      // Check best time execution stats
+      if (trade.traded_in_best_time === true) {
+        bestTimeTradesCount++;
+        if (isWin) bestTimeWinsCount++;
+      } else if (trade.traded_in_best_time === false) {
+        outsideBestTimeTradesCount++;
+        if (isWin) outsideBestTimeWinsCount++;
       }
 
       const symbol = trade.instrument?.symbol || 'UNKNOWN';
@@ -704,7 +1038,9 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const avgWin = winningTrades > 0 ? grossProfit / winningTrades : 0;
     const avgLoss = losingTrades > 0 ? grossLoss / losingTrades : 0;
 
-    // Find best instrument
+    const bestTimeWinRate = bestTimeTradesCount > 0 ? (bestTimeWinsCount / bestTimeTradesCount) * 100 : 0;
+    const outsideBestTimeWinRate = outsideBestTimeTradesCount > 0 ? (outsideBestTimeWinsCount / outsideBestTimeTradesCount) * 100 : 0;
+
     let bestInstrument: { symbol: string; pnl: number } | null = null;
     let highestPnl = -Infinity;
     Object.entries(instrumentPnlMap).forEach(([symbol, pnl]) => {
@@ -726,6 +1062,14 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       avgWin,
       avgLoss,
       maxDrawdown: 0,
+      rulesDisciplinedTrades,
+      rulesBrokenTrades,
+      bestTimeTradesCount,
+      bestTimeWinsCount,
+      bestTimeWinRate,
+      outsideBestTimeTradesCount,
+      outsideBestTimeWinsCount,
+      outsideBestTimeWinRate,
     };
   }, [trades]);
 
@@ -749,6 +1093,14 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         updateInstrument,
         deleteInstrument,
         resetStarterInstruments,
+        avatarUrl,
+        updateAvatarUrl,
+        tradingRules,
+        updateTradingRule,
+        resetTradingRules,
+        bestTimesOverrides,
+        updateBestTimeOverride,
+        resetBestTimeOverrides,
         refreshData,
         analyticsStats,
         getDayTrades,

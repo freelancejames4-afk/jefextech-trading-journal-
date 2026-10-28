@@ -13,6 +13,7 @@ import {
   Smile,
   AlertTriangle,
   ZoomIn,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface TradeDetailModalProps {
@@ -262,6 +263,37 @@ export const TradeDetailModal: React.FC<TradeDetailModalProps> = ({
                 </span>
               </div>
             </div>
+
+            {/* Trading Rules Followed */}
+            {trade.rules_followed && trade.rules_followed.length > 0 && (
+              <div className="p-3.5 bg-zinc-50 dark:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 rounded-xl">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] text-zinc-500 uppercase font-mono flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <span>Trading Rules Adherence</span>
+                  </span>
+                  <span
+                    className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-semibold ${
+                      trade.rules_followed.length === 10
+                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-400'
+                        : 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-400'
+                    }`}
+                  >
+                    {trade.rules_followed.length}/10 Rules Followed
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {trade.rules_followed.map((num) => (
+                    <span
+                      key={num}
+                      className="px-2 py-0.5 text-[10px] font-mono rounded bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300"
+                    >
+                      Rule #{num}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Notes */}
             {trade.notes && (
