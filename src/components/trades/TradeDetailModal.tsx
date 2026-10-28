@@ -14,7 +14,13 @@ import {
   AlertTriangle,
   ZoomIn,
   ShieldCheck,
+  Bot,
+  Loader2,
+  RefreshCw,
+  AlertCircle,
+  Sparkles,
 } from 'lucide-react';
+import { MarkdownContent } from '../common/MarkdownContent';
 
 interface TradeDetailModalProps {
   trade: Trade | null;
@@ -29,10 +35,68 @@ export const TradeDetailModal: React.FC<TradeDetailModalProps> = ({
   onClose,
   onEdit,
 }) => {
-  const { deleteTrade } = useJournal();
+  const { deleteTrade, checkTradeFeedback } = useJournal();
   const { showToast } = useToast();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+
+  const [feedback, setFeedback] = useState<string | null>(trade?.ai_feedback || null);
+  const [isPolling, setIsPolling] = useState(false);
+  const [pollTimeoutReached, setPollTimeoutReached] = useState(false);
+  const [pollSeconds, setPollSeconds] = useState(0);
+
+  React.useEffect(() => {
+    if (!trade) return;
+    setFeedback(trade.ai_feedback || null);
+    setPollTimeoutReached(false);
+    setPollSeconds(0);
+
+    if (trade.ai_feedback && trade.ai_feedback.trim().length > 0) {
+      setIsPolling(false);
+      return;
+    }
+
+    // Start re-checking every 10 seconds for up to 2 minutes
+    setIsPolling(true);
+    let elapsed = 0;
+    const interval = setInterval(async () => {
+      elapsed += 10;
+      setPollSeconds(elapsed);
+
+      const latest = await checkTradeFeedback(trade.id);
+      if (latest && latest.trim().length > 0) {
+        setFeedback(latest);
+        setIsPolling(false);
+        clearInterval(interval);
+        return;
+      }
+
+      if (elapsed >= 120) {
+        clearInterval(interval);
+        setIsPolling(false);
+        setPollTimeoutReached(true);
+      }
+    }, 10000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [trade?.id, trade?.ai_feedback, checkTradeFeedback]);
+
+  const handleManualRecheck = async () => {
+    if (!trade) return;
+    setIsPolling(true);
+    setPollTimeoutReached(false);
+    const latest = await checkTradeFeedback(trade.id);
+    setIsPolling(false);
+    if (latest && latest.trim().length > 0) {
+      setFeedback(latest);
+      showToast('AI Coach feedback retrieved!', 'success');
+    } else {
+      setPollTimeoutReached(true);
+      showToast('Checked Supabase: No feedback returned yet.', 'info');
+    }
+  };
 
   if (!isOpen || !trade) return null;
 
@@ -306,6 +370,82 @@ export const TradeDetailModal: React.FC<TradeDetailModalProps> = ({
                 </div>
               </div>
             )}
+
+            {/* AI Coach Feedback Card */}
+            <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-[#0E0E11] p-4 sm:p-5 overflow-hidden">
+              <div className="flex items-center justify-between pb-3 mb-3 border-b border-zinc-200 dark:border-zinc-800/80">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                    <Bot className="w-4 h-4 stroke-[2.5]" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider font-mono text-zinc-900 dark:text-white flex items-center gap-2">
+                      <span>AI Coach Feedback</span>
+                      {feedback ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 lowercase font-mono">
+                          analyzed
+                        </span>
+                      ) : isPolling ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 lowercase font-mono flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                          evaluating
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 lowercase font-mono">
+                          pending
+                        </span>
+                      )}
+                    </h3>
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">
+                      Automated execution appraisal & discipline assessment
+                    </p>
+                  </div>
+                </div>
+
+                {pollTimeoutReached && !feedback && (
+                  <button
+                    type="button"
+                    onClick={handleManualRecheck}
+                    disabled={isPolling}
+                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-white dark:bg-[#18181B] hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isPolling ? 'animate-spin' : ''}`} />
+                    <span>Check again</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Feedback Content / Polling State */}
+              {feedback ? (
+                <div className="p-4 bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl">
+                  <MarkdownContent content={feedback} />
+                </div>
+              ) : isPolling ? (
+                <div className="p-6 bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl text-center space-y-2.5">
+                  <div className="flex items-center justify-center gap-2 text-emerald-600 dark:text-emerald-400">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span className="text-xs font-semibold">Analyzing your trade...</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto leading-relaxed">
+                    Connecting to the AI Coach webhook. Re-checking every 10 seconds ({pollSeconds}s / 120s)...
+                  </p>
+                </div>
+              ) : (
+                <div className="p-4 bg-white dark:bg-[#121215] border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl flex items-center justify-between gap-3 text-xs text-zinc-500 dark:text-zinc-400">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-zinc-400 shrink-0" />
+                    <span>No feedback yet.</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleManualRecheck}
+                    className="px-3 py-1 bg-zinc-100 dark:bg-[#18181B] hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 rounded-lg text-xs font-semibold border border-zinc-200 dark:border-zinc-800 cursor-pointer shrink-0"
+                  >
+                    Check again
+                  </button>
+                </div>
+              )}
+            </div>
 
             {/* Screenshots Gallery */}
             <div>

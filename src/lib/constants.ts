@@ -134,6 +134,7 @@ create table if not exists public.trades (
 -- Ensure rules_followed column exists if table was already created
 alter table public.trades add column if not exists rules_followed int[] default '{}';
 alter table public.trades add column if not exists traded_in_best_time boolean default false;
+alter table public.trades add column if not exists ai_feedback text;
 
 -- 4. Create profiles table (for round profile logo)
 create table if not exists public.profiles (

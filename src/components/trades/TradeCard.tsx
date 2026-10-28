@@ -69,6 +69,19 @@ export const TradeCard: React.FC<TradeCardProps> = ({ trade, onClick }) => {
             <span className="text-xs text-zinc-500 dark:text-zinc-400 font-mono">
               {trade.lot_size} lot{trade.lot_size !== 1 ? 's' : ''}
             </span>
+
+            {/* AI Feedback Status Badge */}
+            {trade.ai_feedback && trade.ai_feedback.trim().length > 0 ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                Analyzed
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                Pending
+              </span>
+            )}
           </div>
 
           {/* Net P&L */}

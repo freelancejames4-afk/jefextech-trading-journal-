@@ -41,10 +41,19 @@ export interface Trade {
   screenshot_urls: string[];
   rules_followed?: number[]; // IDs/numbers of rules followed (1 to 10)
   traded_in_best_time?: boolean; // True if executed within optimal session window
+  ai_feedback?: string | null; // AI Coach analysis for this trade
   created_at: string;
   // Joined or resolved client-side:
   instrument?: Instrument;
   journal_day?: JournalDay;
+}
+
+export interface ChatMessage {
+  id: string;
+  sender: 'user' | 'assistant';
+  text: string;
+  timestamp: string;
+  status?: 'sending' | 'sent' | 'error';
 }
 
 export interface TradingRule {

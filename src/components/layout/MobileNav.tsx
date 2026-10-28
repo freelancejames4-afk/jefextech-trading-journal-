@@ -1,5 +1,5 @@
 import React from 'react';
-import { CalendarDays, Layers, BarChart3, Clock, SlidersHorizontal, Settings, Plus } from 'lucide-react';
+import { CalendarDays, Layers, BarChart3, Clock, Bot, SlidersHorizontal, Settings, Plus } from 'lucide-react';
 
 interface MobileNavProps {
   currentTab: string;
@@ -16,6 +16,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
     { id: 'journal', label: 'Journal', icon: CalendarDays },
     { id: 'trades', label: 'Trades', icon: Layers },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'coach', label: 'Coach', icon: Bot },
     { id: 'best-times', label: 'Times', icon: Clock },
     { id: 'instruments', label: 'Pairs', icon: SlidersHorizontal },
     { id: 'settings', label: 'Settings', icon: Settings },

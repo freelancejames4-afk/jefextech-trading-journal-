@@ -20,6 +20,8 @@ interface JournalContextType {
   addTrade: (trade: Omit<Trade, 'id' | 'user_id' | 'created_at'>) => Promise<Trade>;
   updateTrade: (id: string, trade: Partial<Trade>) => Promise<Trade>;
   deleteTrade: (id: string) => Promise<void>;
+  checkTradeFeedback: (tradeId: string) => Promise<string | null>;
+  updateTradeFeedback: (tradeId: string, feedback: string) => void;
   // Instrument actions
   addInstrument: (symbol: string, name: string, market_type: MarketType) => Promise<Instrument>;
   updateInstrument: (id: string, symbol: string, name: string, market_type: MarketType) => Promise<Instrument>;
@@ -244,6 +246,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
           instrument: activeInstruments.find((i) => i.id === t.instrument_id),
           rules_followed: Array.isArray(t.rules_followed) ? t.rules_followed : [],
           traded_in_best_time: t.traded_in_best_time === true,
+          ai_feedback: t.ai_feedback || null,
         }));
         setTrades(resolvedTrades);
         localStorage.setItem(getStorageKey('trades'), JSON.stringify(resolvedTrades));
@@ -629,6 +632,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (tradeData.screenshot_urls !== undefined) updatePayload.screenshot_urls = tradeData.screenshot_urls;
       if (tradeData.rules_followed !== undefined) updatePayload.rules_followed = tradeData.rules_followed;
       if (tradeData.traded_in_best_time !== undefined) updatePayload.traded_in_best_time = tradeData.traded_in_best_time;
+      if (tradeData.ai_feedback !== undefined) updatePayload.ai_feedback = tradeData.ai_feedback;
 
       const { data, error: updateErr } = await client
         .from('trades')
@@ -643,6 +647,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
           ...data,
           rules_followed: data.rules_followed || tradeData.rules_followed || existing.rules_followed || [],
           traded_in_best_time: data.traded_in_best_time !== undefined ? data.traded_in_best_time : (tradeData.traded_in_best_time ?? existing.traded_in_best_time ?? false),
+          ai_feedback: data.ai_feedback || tradeData.ai_feedback || existing.ai_feedback || null,
           instrument: updatedTrade.instrument,
         };
         setTrades((prev) => prev.map((t) => (t.id === id ? finalTrade : t)));
@@ -675,6 +680,37 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     setTrades((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  // Check AI Feedback for a specific trade (polls or refreshes)
+  const checkTradeFeedback = async (tradeId: string): Promise<string | null> => {
+    if (!user) return null;
+    try {
+      const client = getSupabaseClient();
+      const { data, error } = await client
+        .from('trades')
+        .select('ai_feedback')
+        .eq('id', tradeId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (!error && data?.ai_feedback && data.ai_feedback.trim().length > 0) {
+        setTrades((prev) =>
+          prev.map((t) => (t.id === tradeId ? { ...t, ai_feedback: data.ai_feedback } : t))
+        );
+        return data.ai_feedback;
+      }
+    } catch (e) {
+      console.warn('Check trade feedback error:', e);
+    }
+    return null;
+  };
+
+  // Update AI Feedback locally in state
+  const updateTradeFeedback = (tradeId: string, feedback: string) => {
+    setTrades((prev) =>
+      prev.map((t) => (t.id === tradeId ? { ...t, ai_feedback: feedback } : t))
+    );
   };
 
   // Add Instrument
@@ -1089,6 +1125,8 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         addTrade,
         updateTrade,
         deleteTrade,
+        checkTradeFeedback,
+        updateTradeFeedback,
         addInstrument,
         updateInstrument,
         deleteInstrument,

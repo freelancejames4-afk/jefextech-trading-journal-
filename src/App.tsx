@@ -12,6 +12,9 @@ import { AnalyticsView } from './components/analytics/AnalyticsView';
 import { InstrumentsView } from './components/instruments/InstrumentsView';
 import { SettingsView } from './components/settings/SettingsView';
 import { BestTimesView } from './components/besttimes/BestTimesView';
+import { AICoachView } from './components/coach/AICoachView';
+import { FloatingCoachWidget } from './components/coach/FloatingCoachWidget';
+import { CoachProvider } from './contexts/CoachContext';
 import { AddTradeModal } from './components/trades/AddTradeModal';
 import { TradeDetailModal } from './components/trades/TradeDetailModal';
 import { TradingRulesModal } from './components/rules/TradingRulesModal';
@@ -154,6 +157,10 @@ const MainApp: React.FC = () => {
           <BestTimesView />
         )}
 
+        {currentTab === 'coach' && (
+          <AICoachView />
+        )}
+
         {currentTab === 'instruments' && (
           <InstrumentsView />
         )}
@@ -211,6 +218,9 @@ const MainApp: React.FC = () => {
         onClose={() => setIsConfigOpen(false)}
         onSaved={() => refreshData()}
       />
+
+      {/* Floating AI Coach Widget on all screens */}
+      <FloatingCoachWidget currentTab={currentTab} />
     </div>
   );
 };
@@ -221,7 +231,9 @@ export default function App() {
       <ToastProvider>
         <AuthProvider>
           <JournalProvider>
-            <MainApp />
+            <CoachProvider>
+              <MainApp />
+            </CoachProvider>
           </JournalProvider>
         </AuthProvider>
       </ToastProvider>

@@ -19,6 +19,7 @@ import {
   HardDrive,
   Clock,
   Sparkles,
+  Bot,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useJournal } from '../../contexts/JournalContext';
@@ -554,6 +555,17 @@ export const SettingsView: React.FC = () => {
                 </span>
                 <span className="font-mono text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold">
                   Synced & Active
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-50 dark:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 text-xs">
+                <span className="text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
+                  <Bot className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  AI Coach (n8n Webhook)
+                </span>
+                <span className="font-mono text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Active
                 </span>
               </div>
 
